@@ -28,6 +28,7 @@ const ui = {
   start: document.getElementById('start'),
   startBtn: document.getElementById('startBtn'),
   levelup: document.getElementById('levelup'),
+  modalTitle: document.getElementById('modalTitle'),
   choices: document.getElementById('choices'),
 };
 
@@ -63,7 +64,7 @@ window.addEventListener('keydown', (e) => {
     if (!paused) requestAnimationFrame(loop);
     return;
   }
-  if (state.mode === 'levelup') {
+  if (state.mode === 'levelup' || state.mode === 'chest') {
     if (e.code === 'Digit1') chooseUpgrade(0);
     if (e.code === 'Digit2') chooseUpgrade(1);
     if (e.code === 'Digit3') chooseUpgrade(2);
@@ -187,9 +188,11 @@ const weapons = {
   }
 };
 
-const bullets = []; // {x,y,vx,vy,r, dmg, pierce, life, color}
-const enemies = []; // {x,y,r, hp, speed, touchDmg, vx,vy, frozenUntil, burnUntil, burnDps, bladeHitCd}
-const gems = [];    // {x,y,r, xp}
+const bullets = [];       // player bullets {x,y,vx,vy,r, dmg, pierce, life, color}
+const enemyBullets = [];  // enemy bullets  {x,y,vx,vy,r, dmg, life}
+const enemies = [];       // {x,y,r, hp, speed, touchDmg, vx,vy, frozenUntil, burnUntil, burnDps, bladeHitCd, type, elite, shootCd, shootBase, shootSpeed, shootDmg}
+const gems = [];          // {x,y,r, xp}
+const chests = [];        // {x,y,r}
 
 // Visual/area effects
 const effects = [];
@@ -211,23 +214,51 @@ function spawnEnemy() {
   if (side === 2) { sx = px + rand(-w / 2, w / 2); sy = py + h / 2 + margin; }
   if (side === 3) { sx = px - w / 2 - margin; sy = py + rand(-h / 2, h / 2); }
 
-  const tier = Math.min(5, 1 + (state.elapsed / 55) | 0);
-  const r = 11 + tier * 1.5;
-  const hp = 24 + tier * 10 + rand(0, 10);
-  const speed = 72 + tier * 14 + rand(-8, 10);
+  const tier = Math.min(6, 1 + (state.elapsed / 55) | 0);
+
+  // enemy mix
+  const rangerChance = clamp(0.12 + state.elapsed / 260 * 0.05, 0.12, 0.22);
+  const eliteChance = clamp(0.02 + state.elapsed / 420 * 0.03, 0.02, 0.08);
+
+  const type = (Math.random() < rangerChance) ? 'ranger' : 'melee';
+  const elite = Math.random() < eliteChance;
+
+  let r = 11 + tier * 1.5;
+  let hp = 24 + tier * 10 + rand(0, 10);
+  let speed = 72 + tier * 14 + rand(-8, 10);
+
+  if (type === 'ranger') {
+    r += 1;
+    hp *= 0.9;
+    speed *= 0.95;
+  }
+
+  if (elite) {
+    r *= 1.35;
+    hp *= 2.1;
+    speed *= 0.92;
+  }
+
   enemies.push({
     x: sx,
     y: sy,
     r,
     hp,
     speed,
-    touchDmg: 10 + tier * 2,
+    touchDmg: (10 + tier * 2) * (elite ? 1.25 : 1),
     vx: 0,
     vy: 0,
     frozenUntil: 0,
     burnUntil: 0,
     burnDps: 0,
     bladeHitCd: 0,
+
+    type,
+    elite,
+    shootCd: rand(0.2, 1.0),
+    shootBase: elite ? 1.15 : 1.45,
+    shootSpeed: elite ? 420 : 380,
+    shootDmg: elite ? 14 : 10,
   });
 }
 
@@ -260,7 +291,19 @@ function killEnemyAt(index) {
   const e = enemies[index];
   if (!e) return;
   state.kills++;
-  gems.push({ x: e.x, y: e.y, r: 6, xp: 4 + ((state.elapsed / 45) | 0) });
+
+  // drop gem(s)
+  const baseXp = 4 + ((state.elapsed / 45) | 0);
+  const drops = e.elite ? 3 : 1;
+  for (let i = 0; i < drops; i++) {
+    gems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 6, xp: baseXp });
+  }
+
+  // elite: chance to drop a treasure chest
+  if (e.elite && Math.random() < 0.70) {
+    chests.push({ x: e.x, y: e.y, r: 12 });
+  }
+
   enemies.splice(index, 1);
 }
 
@@ -499,6 +542,26 @@ function updateBullets(dt) {
     b.life -= dt;
     if (b.life <= 0) bullets.splice(i, 1);
   }
+
+  for (let i = enemyBullets.length - 1; i >= 0; i--) {
+    const b = enemyBullets[i];
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.life -= dt;
+
+    // hit player
+    const d = dist(b.x, b.y, player.x, player.y);
+    if (d < b.r + player.r) {
+      if (player.invuln <= 0) {
+        player.hp -= b.dmg;
+        player.invuln = 0.45;
+      }
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    if (b.life <= 0) enemyBullets.splice(i, 1);
+  }
 }
 
 function collideBullets() {
@@ -536,27 +599,63 @@ function updateEnemies(dt) {
       damageEnemy(e, e.burnDps * dt);
     }
 
-    // movement
     const frozen = now < e.frozenUntil;
+
+    // movement (melee chases, ranger kites)
     if (!frozen) {
-      const [nx, ny] = norm(player.x - e.x, player.y - e.y);
-      e.x += nx * e.speed * dt;
-      e.y += ny * e.speed * dt;
+      const dx = player.x - e.x;
+      const dy = player.y - e.y;
+      const d = Math.hypot(dx, dy);
+      const [nx, ny] = norm(dx, dy);
+
+      if (e.type === 'ranger') {
+        // prefer mid distance
+        if (d > 280) {
+          e.x += nx * e.speed * dt;
+          e.y += ny * e.speed * dt;
+        } else if (d < 190) {
+          e.x -= nx * e.speed * dt;
+          e.y -= ny * e.speed * dt;
+        } else {
+          // slight strafe
+          e.x += (-ny) * (e.speed * 0.25) * dt;
+          e.y += (nx) * (e.speed * 0.25) * dt;
+        }
+
+        // ranged shot
+        e.shootCd = Math.max(0, e.shootCd - dt);
+        if (e.shootCd <= 0 && d < 520) {
+          const [sx, sy] = norm(dx, dy);
+          enemyBullets.push({
+            x: e.x,
+            y: e.y,
+            vx: sx * e.shootSpeed,
+            vy: sy * e.shootSpeed,
+            r: 5,
+            dmg: e.shootDmg,
+            life: 2.2,
+          });
+          e.shootCd = e.shootBase + rand(-0.15, 0.15);
+        }
+      } else {
+        // melee
+        e.x += nx * e.speed * dt;
+        e.y += ny * e.speed * dt;
+      }
     }
 
     // knockback velocity (always)
     e.x += e.vx * dt;
     e.y += e.vy * dt;
-    e.vx *= Math.pow(0.02, dt); // strong damping
+    e.vx *= Math.pow(0.02, dt);
     e.vy *= Math.pow(0.02, dt);
 
     // touch damage
-    const d = dist(e.x, e.y, player.x, player.y);
-    if (d < e.r + player.r) {
+    const d2 = dist(e.x, e.y, player.x, player.y);
+    if (d2 < e.r + player.r) {
       if (player.invuln <= 0) {
         player.hp -= e.touchDmg;
         player.invuln = 0.55;
-        // small knockback
         const [nx, ny] = norm(player.x - e.x, player.y - e.y);
         player.x += nx * 14;
         player.y += ny * 14;
@@ -570,6 +669,19 @@ function updateEnemies(dt) {
 
     if (player.hp <= 0) {
       state.mode = 'dead';
+    }
+  }
+}
+
+function updateChests(dt) {
+  // simple pickup (no magnet)
+  for (let i = chests.length - 1; i >= 0; i--) {
+    const c = chests[i];
+    const d = dist(player.x, player.y, c.x, c.y);
+    if (d < player.r + c.r) {
+      chests.splice(i, 1);
+      openChest();
+      return; // modal opened
     }
   }
 }
@@ -661,6 +773,51 @@ function checkLevelUp() {
 }
 
 // ---------- upgrades
+const CHEST_POOL = [
+  {
+    id: 'chest_heal',
+    title: '神聖藥水：回復 30 HP',
+    desc: '立刻回復生命（不超過上限）。',
+    apply() { player.hp = Math.min(player.hpMax, player.hp + 30); }
+  },
+  {
+    id: 'chest_xp',
+    title: '靈魂洪流：獲得大量經驗',
+    desc: '立即獲得 +40 XP（可能直接再升級）。',
+    apply() { player.xp += 40; checkLevelUp(); }
+  },
+  {
+    id: 'chest_allcdr',
+    title: '符文：全武器冷卻 -8%',
+    desc: '所有武器出手更頻繁。',
+    apply() {
+      weapons.wand.baseCooldown *= 0.92;
+      weapons.bow.baseCooldown *= 0.92;
+      weapons.lightning.baseCooldown *= 0.92;
+      weapons.meteor.baseCooldown *= 0.92;
+      weapons.frost.baseCooldown *= 0.92;
+    }
+  },
+  {
+    id: 'chest_blade_orbit',
+    title: '秘儀：迴旋斬半徑 +18',
+    desc: '刀刃轉得更外圈，命中更安全。',
+    apply() { weapons.blades.radius += 18; }
+  },
+  {
+    id: 'chest_frost_big',
+    title: '冰霜王印：衝擊波範圍 +35',
+    desc: '控場覆蓋更大。',
+    apply() { weapons.frost.maxRadius += 35; }
+  },
+  {
+    id: 'chest_meteor_big',
+    title: '隕火核心：爆炸半徑 +28',
+    desc: '隕石更大更狠。',
+    apply() { weapons.meteor.impactRadius += 28; weapons.meteor.burnRadius += 18; }
+  },
+];
+
 const UPGRADE_POOL = [
   // Wand
   {
@@ -832,10 +989,19 @@ const UPGRADE_POOL = [
 let currentChoices = [];
 
 function openLevelUp() {
-  state.mode = 'levelup';
-  paused = true;
+  openChoiceModal('levelup', '升級！選 1 個', UPGRADE_POOL);
+}
 
-  const pool = UPGRADE_POOL.filter(u => {
+function openChest() {
+  openChoiceModal('chest', '寶箱！選 1 個', CHEST_POOL);
+}
+
+function openChoiceModal(mode, title, poolBase) {
+  state.mode = mode;
+  paused = true;
+  if (ui.modalTitle) ui.modalTitle.textContent = title;
+
+  const pool = poolBase.filter(u => {
     // gate bow upgrades
     if (u.id.startsWith('bow_') && !weapons.bow.enabled) return false;
     if (u.id === 'unlock_bow' && weapons.bow.enabled) return false;
@@ -881,7 +1047,7 @@ function openLevelUp() {
 }
 
 function chooseUpgrade(idx) {
-  if (state.mode !== 'levelup') return;
+  if (state.mode !== 'levelup' && state.mode !== 'chest') return;
   const u = currentChoices[idx];
   if (!u) return;
   u.apply();
@@ -949,6 +1115,26 @@ function draw() {
     ctx.fill();
   }
 
+  // enemy bullets
+  for (const b of enemyBullets) {
+    const [sx, sy] = worldToScreen(b.x, b.y);
+    ctx.fillStyle = 'rgba(255,130,130,.92)';
+    ctx.beginPath();
+    ctx.arc(sx, sy, b.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // chests
+  for (const c of chests) {
+    const [sx, sy] = worldToScreen(c.x, c.y);
+    ctx.fillStyle = 'rgba(246,195,92,.28)';
+    ctx.fillRect(sx - c.r, sy - c.r, c.r * 2, c.r * 2);
+    ctx.strokeStyle = 'rgba(246,195,92,.85)';
+    ctx.strokeRect(sx - c.r, sy - c.r, c.r * 2, c.r * 2);
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    ctx.fillRect(sx - c.r + 3, sy - 2, c.r * 2 - 6, 4);
+  }
+
   // orbit blades
   if (weapons.blades.enabled) {
     const w = weapons.blades;
@@ -971,7 +1157,12 @@ function draw() {
     const [sx, sy] = worldToScreen(e.x, e.y);
     const frozen = state.elapsed < e.frozenUntil;
 
-    ctx.fillStyle = frozen ? 'rgba(120,190,255,.86)' : 'rgba(180,45,65,.92)';
+    let color = 'rgba(180,45,65,.92)';
+    if (e.type === 'ranger') color = 'rgba(220,90,70,.92)';
+    if (e.elite) color = 'rgba(240,140,70,.92)';
+    if (frozen) color = 'rgba(120,190,255,.86)';
+
+    ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(sx, sy, e.r, 0, Math.PI * 2);
     ctx.fill();
@@ -983,6 +1174,14 @@ function draw() {
     ctx.fillRect(sx - w / 2, sy - e.r - 10, w, 4);
     ctx.fillStyle = 'rgba(246,195,92,.78)';
     ctx.fillRect(sx - w / 2, sy - e.r - 10, w * hp01, 4);
+
+    // elite crown
+    if (e.elite && !frozen) {
+      ctx.strokeStyle = 'rgba(246,195,92,.95)';
+      ctx.beginPath();
+      ctx.arc(sx, sy - e.r - 6, 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     // burn indicator
     if (state.elapsed < e.burnUntil) {
@@ -1127,6 +1326,7 @@ function loop(now) {
     collideBullets();
     updateEffects(dt);
     updateEnemies(dt);
+    updateChests(dt);
     updateGems(dt);
   }
 
@@ -1138,8 +1338,10 @@ function loop(now) {
 
 function resetRun() {
   bullets.length = 0;
+  enemyBullets.length = 0;
   enemies.length = 0;
   gems.length = 0;
+  chests.length = 0;
   effects.length = 0;
 
   state.elapsed = 0;
