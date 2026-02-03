@@ -62,6 +62,9 @@ const I18N = {
     music: (on) => `Music: ${on ? 'ON' : 'OFF'}`,
     levelUpTitle: 'Level Up! Choose 1',
     chestTitle: 'Treasure! Choose 1',
+    replaceTitle: 'Weapon Slots Full — Replace One',
+    skip: 'Skip',
+    slotUp: (n) => `Weapon Slot +1 (now ${n})`,
 
     subtitle: 'Survive the horde. Grow your legend.',
     hintMove: 'Move: WASD / Arrow Keys (mobile: joystick)',
@@ -75,11 +78,21 @@ const I18N = {
     startBtn: 'Start Adventure',
     startHint: 'Hotkeys: Enter / Space',
     pauseBtn: 'Pause',
+
+    w_wand: 'Arcane Wand',
+    w_bow: 'Dragon Bow',
+    w_blades: 'Whirling Blades',
+    w_lightning: 'Chain Lightning',
+    w_meteor: 'Meteor',
+    w_frost: 'Frost Shockwave',
   },
   zh: {
     music: (on) => `音樂：${on ? '開' : '關'}`,
     levelUpTitle: '升級！選 1 個',
     chestTitle: '寶箱！選 1 個',
+    replaceTitle: '武器槽已滿：請替換一把',
+    skip: '略過',
+    slotUp: (n) => `武器槽 +1（目前 ${n}）`,
 
     subtitle: '在黑暗中撐住，成長你的傳奇。',
     hintMove: '移動：WASD / 方向鍵（手機：搖桿）',
@@ -93,6 +106,13 @@ const I18N = {
     startBtn: '開始冒險',
     startHint: '快捷鍵：Enter / Space',
     pauseBtn: '暫停',
+
+    w_wand: '秘法魔杖',
+    w_bow: '龍焰弓',
+    w_blades: '迴旋斬',
+    w_lightning: '雷電鏈',
+    w_meteor: '隕石術',
+    w_frost: '冰凍衝擊波',
   },
 };
 
@@ -102,6 +122,10 @@ if (!I18N[lang]) lang = 'zh';
 function t(key, ...args) {
   const v = I18N[lang][key];
   return typeof v === 'function' ? v(...args) : v;
+}
+
+function weaponLabel(key) {
+  return t(`w_${key}`) || key;
 }
 
 function applyStaticI18n() {
@@ -139,6 +163,7 @@ function setLang(next) {
   if (ui.modalTitle) {
     if (state.mode === 'levelup') ui.modalTitle.textContent = t('levelUpTitle');
     if (state.mode === 'chest') ui.modalTitle.textContent = t('chestTitle');
+    if (state.mode === 'replace') ui.modalTitle.textContent = t('replaceTitle');
   }
 
   applyStaticI18n();
@@ -947,6 +972,8 @@ const player = {
   xp: 0,
   xpNeed: 10,
   magnet: 70,
+  weaponSlots: 4,
+  weaponSlotsMax: 6,
   dir: 0,      // 0 down, 1 left, 2 right, 3 up
   moving: false,
   anim: 0,
@@ -1040,9 +1067,12 @@ const enemyBullets = [];  // enemy bullets  {x,y,vx,vy,r, dmg, life}
 const enemies = [];       // {x,y,r, hp, speed, touchDmg, vx,vy, frozenUntil, burnUntil, burnDps, bladeHitCd, type, elite, shootCd, shootBase, shootSpeed, shootDmg}
 const gems = [];          // {x,y,r, xp}
 const chests = [];        // {x,y,r}
+const slotOrbs = [];      // {x,y,r}
 
 // Visual/area effects
 const effects = [];
+
+const toast = { text: '', t: 0 };
 // effects types:
 // - bolt {type:'bolt', pts:[[x,y]..], t, ttl}
 // - meteor {type:'meteor', x,y, t, ttl, delay, radius, stage:'fall'|'impact'}
@@ -1216,6 +1246,11 @@ function killEnemyAt(index) {
     // Elite: guaranteed chest + extra chance.
     chests.push({ x: e.x, y: e.y, r: 12 });
     if (Math.random() < 0.35) chests.push({ x: e.x + rand(-14, 14), y: e.y + rand(-14, 14), r: 12 });
+
+    // Elite: chance to drop a weapon slot (max 6)
+    if (player.weaponSlots < player.weaponSlotsMax && Math.random() < 0.22) {
+      slotOrbs.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 10 });
+    }
   }
 
   enemies.splice(index, 1);
@@ -1688,6 +1723,22 @@ function updateEnemies(dt) {
   }
 }
 
+function updateSlots(dt) {
+  for (let i = slotOrbs.length - 1; i >= 0; i--) {
+    const s = slotOrbs[i];
+    const d = dist(player.x, player.y, s.x, s.y);
+    if (d < player.r + s.r) {
+      slotOrbs.splice(i, 1);
+      if (player.weaponSlots < player.weaponSlotsMax) {
+        player.weaponSlots += 1;
+        toast.text = t('slotUp', player.weaponSlots);
+        toast.t = 2.0;
+      }
+      return;
+    }
+  }
+}
+
 function updateChests(dt) {
   // simple pickup (no magnet)
   for (let i = chests.length - 1; i >= 0; i--) {
@@ -1874,7 +1925,7 @@ const UPGRADE_POOL = [
     id: 'unlock_bow',
     title: '解鎖 Dragon Bow',
     desc: '獲得第二把武器：朝前方射出龍焰箭。',
-    apply() { weapons.bow.enabled = true; }
+    apply() { tryEnableWeapon('bow'); }
   },
   {
     id: 'bow_rate',
@@ -1894,25 +1945,25 @@ const UPGRADE_POOL = [
     id: 'unlock_blades',
     title: '解鎖 迴旋斬（Whirling Blades）',
     desc: '刀刃圍繞你旋轉，碰到敵人造成傷害。',
-    apply() { weapons.blades.enabled = true; }
+    apply() { tryEnableWeapon('blades'); }
   },
   {
     id: 'unlock_lightning',
     title: '解鎖 雷電鏈（Chain Lightning）',
     desc: '自動電擊並跳躍到附近敵人。',
-    apply() { weapons.lightning.enabled = true; }
+    apply() { tryEnableWeapon('lightning'); }
   },
   {
     id: 'unlock_meteor',
     title: '解鎖 隕石術（Meteor）',
     desc: '隨機落下隕石：大範圍傷害 + 燃燒持續傷害。',
-    apply() { weapons.meteor.enabled = true; }
+    apply() { tryEnableWeapon('meteor'); }
   },
   {
     id: 'unlock_frost',
     title: '解鎖 冰凍衝擊波（Frost Shockwave）',
     desc: '震退並冰凍敵人 2 秒。',
-    apply() { weapons.frost.enabled = true; }
+    apply() { tryEnableWeapon('frost'); }
   },
 
   // Blades upgrades
@@ -2018,12 +2069,75 @@ const UPGRADE_POOL = [
 
 let currentChoices = [];
 
+let pendingWeaponUnlock = null;
+
 function openLevelUp() {
   openChoiceModal('levelup', t('levelUpTitle'), UPGRADE_POOL);
 }
 
 function openChest() {
   openChoiceModal('chest', t('chestTitle'), CHEST_POOL);
+}
+
+function openReplaceWeaponModal(newWeaponKey) {
+  pendingWeaponUnlock = newWeaponKey;
+  state.mode = 'replace';
+  paused = true;
+  if (ui.modalTitle) ui.modalTitle.textContent = t('replaceTitle');
+
+  const enabled = enabledWeaponKeys();
+  currentChoices = enabled.map(k => ({
+    id: `replace_${k}`,
+    title: { zh: `替換：${weaponLabel(k)}`, en: `Replace: ${weaponLabel(k)}` },
+    desc: { zh: `用 ${weaponLabel(newWeaponKey)} 取代 ${weaponLabel(k)}`, en: `Swap ${weaponLabel(k)} for ${weaponLabel(newWeaponKey)}` },
+    apply() {
+      weapons[k].enabled = false;
+      weapons[newWeaponKey].enabled = true;
+      pendingWeaponUnlock = null;
+    }
+  }));
+  currentChoices.push({
+    id: 'replace_skip',
+    title: { zh: t('skip'), en: t('skip') },
+    desc: { zh: '不拿這把武器。', en: 'Do not take this weapon.' },
+    apply() { pendingWeaponUnlock = null; }
+  });
+
+  ui.choices.innerHTML = '';
+  currentChoices.forEach((u, idx) => {
+    const div = document.createElement('div');
+    div.className = 'choice';
+    const title = (typeof u.title === 'object') ? (u.title[lang] || u.title.en || u.title.zh) : u.title;
+    const desc = (typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc;
+    div.innerHTML = `<div class="t">${idx + 1}. ${title}</div><div class="d">${desc}</div>`;
+    div.addEventListener('click', () => chooseUpgrade(idx));
+    ui.choices.appendChild(div);
+  });
+
+  ui.levelup.classList.remove('hidden');
+}
+
+function enabledWeaponKeys() {
+  // count only main weapons (ignore wand always enabled? No: wand counts as a slot)
+  return ['wand', 'bow', 'blades', 'lightning', 'meteor', 'frost'].filter(k => weapons[k].enabled);
+}
+
+function weaponEnabledCount() {
+  return enabledWeaponKeys().length;
+}
+
+function tryEnableWeapon(key) {
+  if (weapons[key].enabled) return true;
+
+  // if there's room, enable it
+  if (weaponEnabledCount() < player.weaponSlots) {
+    weapons[key].enabled = true;
+    return true;
+  }
+
+  // otherwise ask to replace
+  openReplaceWeaponModal(key);
+  return false;
 }
 
 function openChoiceModal(mode, title, poolBase) {
@@ -2079,7 +2193,7 @@ function openChoiceModal(mode, title, poolBase) {
 }
 
 function chooseUpgrade(idx) {
-  if (state.mode !== 'levelup' && state.mode !== 'chest') return;
+  if (state.mode !== 'levelup' && state.mode !== 'chest' && state.mode !== 'replace') return;
   const u = currentChoices[idx];
   if (!u) return;
   u.apply();
@@ -2157,6 +2271,13 @@ function draw() {
   }
 
   // enemy bullets disabled
+
+  // weapon slot orbs
+  for (const s of slotOrbs) {
+    const [sx, sy] = worldToScreen(s.x, s.y);
+    // reuse gold orb sprite for now
+    drawSprite(SPR.orbGold, sx, sy, { scale: 1.15, alpha: 0.95 });
+  }
 
   // chests
   for (const c of chests) {
@@ -2323,6 +2444,18 @@ function draw() {
     ctx.fillText('Paused (press P)', 18, 34);
   }
 
+  // toast
+  if (toast.t > 0) {
+    ctx.save();
+    ctx.globalAlpha = clamp(toast.t / 2, 0, 1);
+    ctx.fillStyle = 'rgba(0,0,0,.45)';
+    ctx.fillRect(16, canvas.height - 54, 360, 34);
+    ctx.fillStyle = 'rgba(246,195,92,.95)';
+    ctx.font = '16px system-ui';
+    ctx.fillText(toast.text, 26, canvas.height - 30);
+    ctx.restore();
+  }
+
   if (state.mode === 'dead') {
     ctx.fillStyle = 'rgba(0,0,0,.62)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2361,6 +2494,8 @@ function loop(now) {
   if (state.mode === 'play') {
     state.elapsed = (now - state.t0) / 1000;
 
+    toast.t = Math.max(0, toast.t - dt);
+
     updatePlayer(dt);
 
     // spawn pacing ramps up
@@ -2389,6 +2524,7 @@ function loop(now) {
     collideBullets();
     updateEffects(dt);
     updateEnemies(dt);
+    updateSlots(dt);
     updateChests(dt);
     updateGems(dt);
   }
@@ -2405,7 +2541,11 @@ function resetRun() {
   enemies.length = 0;
   gems.length = 0;
   chests.length = 0;
+  slotOrbs.length = 0;
   effects.length = 0;
+
+  toast.text = '';
+  toast.t = 0;
 
   state.elapsed = 0;
   state.kills = 0;
@@ -2422,6 +2562,8 @@ function resetRun() {
   player.xp = 0;
   player.xpNeed = 10;
   player.magnet = 70;
+  player.weaponSlots = 4;
+  player.weaponSlotsMax = 6;
 
   weapons.wand.enabled = true;
   weapons.wand.baseCooldown = 0.45;
