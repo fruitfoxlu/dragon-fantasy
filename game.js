@@ -65,6 +65,7 @@ const I18N = {
     replaceTitle: 'Weapon Slots Full — Replace One',
     skip: 'Skip',
     slotUp: (n) => `Weapon Slot +1 (now ${n})`,
+    vacuum: 'Vacuum Gem: Loot pulled to you!',
 
     subtitle: 'Survive the horde. Grow your legend.',
     hintMove: 'Move: WASD / Arrow Keys (mobile: joystick)',
@@ -93,6 +94,7 @@ const I18N = {
     replaceTitle: '武器槽已滿：請替換一把',
     skip: '略過',
     slotUp: (n) => `武器槽 +1（目前 ${n}）`,
+    vacuum: '真空寶石：全地圖掉落吸到你身上！',
 
     subtitle: '在黑暗中撐住，成長你的傳奇。',
     hintMove: '移動：WASD / 方向鍵（手機：搖桿）',
@@ -670,6 +672,17 @@ const SPR = {
     px(g, 2, 4, 6, 4, 'rgba(246,195,92,.85)');
   }),
 
+  vacuumGem: makeSprite(16, 16, (g) => {
+    // a bright cyan gem
+    px(g, 7, 1, 2, 2, '#ffffff');
+    px(g, 6, 3, 4, 4, '#bffcf0');
+    px(g, 5, 6, 6, 6, '#7cf2d0');
+    px(g, 6, 7, 4, 4, '#36a15f');
+    px(g, 7, 6, 2, 2, '#fff6dc');
+    // outline
+    outline(g, 5, 3, 6, 9, 'rgba(0,0,0,.28)');
+  }),
+
   boneShot: makeSprite(10, 6, (g) => {
     px(g, 1, 2, 8, 2, '#e9e6dd');
     px(g, 0, 1, 2, 1, '#d6d1c4');
@@ -854,6 +867,9 @@ function drawSprite(img, sx, sy, { scale = 1, rot = 0, alpha = 1 } = {}) {
 const keys = new Set();
 let mouse = { x: canvas.width / 2, y: canvas.height / 2, down: false };
 let paused = false;
+
+// balance knobs
+const XP_MULT = 0.5; // slow leveling by 50%
 
 window.addEventListener('keydown', (e) => {
   if (state.mode === 'start') {
@@ -1068,6 +1084,7 @@ const enemies = [];       // {x,y,r, hp, speed, touchDmg, vx,vy, frozenUntil, bu
 const gems = [];          // {x,y,r, xp}
 const chests = [];        // {x,y,r}
 const slotOrbs = [];      // {x,y,r}
+const vacuumGems = [];    // {x,y,r}
 
 // Visual/area effects
 const effects = [];
@@ -1114,9 +1131,9 @@ function spawnEnemy() {
   }
 
   if (elite) {
-    r *= 1.35;
+    r *= 3.0;
     hp *= 3.0;
-    speed *= 0.90;
+    speed *= 0.72;
   }
 
   enemies.push({
@@ -1227,7 +1244,7 @@ function killEnemyAt(index) {
   state.kills++;
 
   // drop gem(s)
-  const baseXp = 4 + ((state.elapsed / 45) | 0);
+  const baseXp = (4 + ((state.elapsed / 45) | 0)) * XP_MULT;
   const drops = e.elite ? 3 : 1;
   for (let i = 0; i < drops; i++) {
     gems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 6, xp: baseXp });
@@ -1242,6 +1259,8 @@ function killEnemyAt(index) {
     for (let k = 0; k < 10; k++) {
       gems.push({ x: e.x + rand(-28, 28), y: e.y + rand(-28, 28), r: 6, xp: baseXp * 2 });
     }
+    // Boss: guaranteed vacuum gem
+    vacuumGems.push({ x: e.x, y: e.y, r: 14 });
   } else if (e.elite) {
     // Elite: guaranteed chest + extra chance.
     chests.push({ x: e.x, y: e.y, r: 12 });
@@ -1250,6 +1269,11 @@ function killEnemyAt(index) {
     // Elite: chance to drop a weapon slot (max 6)
     if (player.weaponSlots < player.weaponSlotsMax && Math.random() < 0.22) {
       slotOrbs.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 10 });
+    }
+
+    // Elite: rare vacuum gem
+    if (Math.random() < 0.10) {
+      vacuumGems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12 });
     }
   }
 
@@ -1723,6 +1747,27 @@ function updateEnemies(dt) {
   }
 }
 
+function vacuumAllLootToPlayer() {
+  // pull everything close to player so it gets collected quickly.
+  for (const g of gems) { g.x = player.x + rand(-8, 8); g.y = player.y + rand(-8, 8); }
+  for (const c of chests) { c.x = player.x + rand(-18, 18); c.y = player.y + rand(-18, 18); }
+  for (const s of slotOrbs) { s.x = player.x + rand(-12, 12); s.y = player.y + rand(-12, 12); }
+}
+
+function updateVacuumGems(dt) {
+  for (let i = vacuumGems.length - 1; i >= 0; i--) {
+    const v = vacuumGems[i];
+    const d = dist(player.x, player.y, v.x, v.y);
+    if (d < player.r + v.r) {
+      vacuumGems.splice(i, 1);
+      vacuumAllLootToPlayer();
+      toast.text = t('vacuum');
+      toast.t = 2.0;
+      return;
+    }
+  }
+}
+
 function updateSlots(dt) {
   for (let i = slotOrbs.length - 1; i >= 0; i--) {
     const s = slotOrbs[i];
@@ -1865,7 +1910,7 @@ const CHEST_POOL = [
     id: 'chest_xp',
     title: { zh: '靈魂洪流：獲得大量經驗', en: 'Soul Surge: Gain Lots of XP' },
     desc: { zh: '立即獲得 +40 XP（可能直接再升級）。', en: 'Gain +40 XP immediately (may trigger another level-up).' },
-    apply() { player.xp += 40; checkLevelUp(); }
+    apply() { player.xp += 40 * XP_MULT; checkLevelUp(); }
   },
   {
     id: 'chest_allcdr',
@@ -2272,6 +2317,12 @@ function draw() {
 
   // enemy bullets disabled
 
+  // vacuum gems
+  for (const v of vacuumGems) {
+    const [sx, sy] = worldToScreen(v.x, v.y);
+    drawSprite(SPR.vacuumGem, sx, sy, { scale: 1.2, alpha: 0.98 });
+  }
+
   // weapon slot orbs
   for (const s of slotOrbs) {
     const [sx, sy] = worldToScreen(s.x, s.y);
@@ -2310,9 +2361,27 @@ function draw() {
     const f = frozen ? 0 : (Math.floor(e.anim * 8) % 4);
 
     const base = (e.type === 'ranger') ? SPR.skullRanger : SPR.skullMelee;
-    const scale = e.elite ? 1.35 : 1.0;
+    const scale = e.elite ? 3.0 : 1.0;
     const alpha = frozen ? 0.75 : 1;
+
+    // Elite visual: add a golden helmet overlay + glowing eyes
     drawSprite(base[e.dir][f], sx, sy, { scale, alpha });
+    if (e.elite && !frozen) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.globalAlpha = 0.95;
+      ctx.translate(sx, sy);
+      // helmet (pixel blocks)
+      ctx.fillStyle = 'rgba(246,195,92,.95)';
+      ctx.fillRect(-8 * scale/3, -20 * scale/3, 16 * scale/3, 6 * scale/3);
+      ctx.fillRect(-10 * scale/3, -18 * scale/3, 4 * scale/3, 4 * scale/3);
+      ctx.fillRect(6 * scale/3, -18 * scale/3, 4 * scale/3, 4 * scale/3);
+      // eyes glow
+      ctx.fillStyle = 'rgba(124,242,208,.9)';
+      ctx.fillRect(-4 * scale/3, -10 * scale/3, 2 * scale/3, 2 * scale/3);
+      ctx.fillRect(2 * scale/3, -10 * scale/3, 2 * scale/3, 2 * scale/3);
+      ctx.restore();
+    }
 
     // elite halo (pixel-ish)
     if (e.elite && !frozen) {
@@ -2524,6 +2593,7 @@ function loop(now) {
     collideBullets();
     updateEffects(dt);
     updateEnemies(dt);
+    updateVacuumGems(dt);
     updateSlots(dt);
     updateChests(dt);
     updateGems(dt);
@@ -2542,6 +2612,7 @@ function resetRun() {
   gems.length = 0;
   chests.length = 0;
   slotOrbs.length = 0;
+  vacuumGems.length = 0;
   effects.length = 0;
 
   toast.text = '';
@@ -2621,8 +2692,8 @@ function startGame() {
   ui.start.style.display = 'none';
 
   // Audio autoplay policy: start only on user gesture.
-  // Default ON for a nicer first impression.
-  toggleMusic(true);
+  // Default OFF.
+  toggleMusic(false);
 
   resetRun();
   state.t0 = performance.now();
