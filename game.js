@@ -3,12 +3,12 @@
 
    Controls:
    - Move: WASD / Arrow keys
-   - Aim: mouse (for Dragon Bow)
+   - Aim: auto / forward
    - Pause: P
 
    Weapons (mixed targeting):
    - Arcane Wand: auto-aim nearest (projectiles)
-   - Dragon Bow: aim toward mouse (projectiles)
+   - Dragon Bow: fire forward (projectiles)
    - Whirling Blades: orbit around hero (contact)
    - Chain Lightning: auto chain to nearby enemies (hitscan)
    - Meteor: random AoE + burning field DoT
@@ -559,7 +559,7 @@ const player = {
 };
 
 // weapon model:
-// - projectile types: kind auto|mouse uses bullets
+// - projectile types: kind auto|forward uses bullets
 // - special types implement their own firing in updateWeapons
 const weapons = {
   wand: {
@@ -576,7 +576,7 @@ const weapons = {
   },
   bow: {
     name: 'Dragon Bow',
-    kind: 'mouse',
+    kind: 'forward',
     enabled: false,
     cd: 0,
     baseCooldown: 0.8,
@@ -728,7 +728,7 @@ function fireBullet(fromX, fromY, dirX, dirY, spec) {
     dmg: spec.damage,
     pierce: spec.pierce,
     life: 1.6,
-    color: spec.kind === 'mouse' ? '#f6c35c' : '#7cf2d0',
+    color: spec.kind === 'forward' ? '#f6c35c' : '#7cf2d0',
   });
 }
 
@@ -792,6 +792,14 @@ function updatePlayer(dt) {
   player.invuln = Math.max(0, player.invuln - dt);
 }
 
+function forwardVec(dir) {
+  // 0 down, 1 left, 2 right, 3 up
+  if (dir === 0) return [0, 1];
+  if (dir === 1) return [-1, 0];
+  if (dir === 2) return [1, 0];
+  return [0, -1];
+}
+
 function updateProjectileWeapons(dt) {
   for (const w of [weapons.wand, weapons.bow]) {
     if (!w.enabled) continue;
@@ -805,10 +813,10 @@ function updateProjectileWeapons(dt) {
       aimX = e.x - player.x;
       aimY = e.y - player.y;
     } else {
-      const worldMx = state.camera.x + mouse.x;
-      const worldMy = state.camera.y + mouse.y;
-      aimX = worldMx - player.x;
-      aimY = worldMy - player.y;
+      // forward fire (based on hero facing)
+      const [fx, fy] = forwardVec(player.dir);
+      aimX = fx;
+      aimY = fy;
     }
 
     for (let i = 0; i < w.projectiles; i++) {
@@ -1637,10 +1645,8 @@ function draw() {
     const f = player.moving ? (Math.floor(player.anim * 10) % 4) : 0;
     drawSprite(SPR.hero[player.dir][f], sx, sy, { scale: 1, alpha });
 
-    // bow aim indicator (keep as subtle line)
-    const worldMx = state.camera.x + mouse.x;
-    const worldMy = state.camera.y + mouse.y;
-    const [nx, ny] = norm(worldMx - player.x, worldMy - player.y);
+    // forward aim indicator (subtle)
+    const [nx, ny] = forwardVec(player.dir);
     ctx.strokeStyle = 'rgba(246,195,92,.28)';
     ctx.beginPath();
     ctx.moveTo(sx, sy);
