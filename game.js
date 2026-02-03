@@ -25,11 +25,15 @@ const ui = {
   xpNeed: document.getElementById('xpNeed'),
   kills: document.getElementById('kills'),
   time: document.getElementById('time'),
+  musicBtn: document.getElementById('musicBtn'),
   start: document.getElementById('start'),
   startBtn: document.getElementById('startBtn'),
   levelup: document.getElementById('levelup'),
   modalTitle: document.getElementById('modalTitle'),
   choices: document.getElementById('choices'),
+  joy: document.getElementById('joy'),
+  joyKnob: document.querySelector('#joy .joyKnob'),
+  pauseBtn: document.getElementById('pauseBtn'),
 };
 
 // ---------- helpers
@@ -41,6 +45,163 @@ const norm = (x, y) => {
 };
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+
+// ---------- audio (procedural fantasy-ish BGM)
+let audio = {
+  ctx: null,
+  master: null,
+  musicOn: false,
+  timer: null,
+  t0: 0,
+};
+
+function setMusicLabel() {
+  if (!ui.musicBtn) return;
+  ui.musicBtn.textContent = `Music: ${audio.musicOn ? 'ON' : 'OFF'}`;
+}
+
+function ensureAudio() {
+  if (audio.ctx) return;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  audio.ctx = new Ctx();
+  audio.master = audio.ctx.createGain();
+  audio.master.gain.value = 0.22;
+  audio.master.connect(audio.ctx.destination);
+}
+
+function stopMusic() {
+  if (!audio.ctx) return;
+  if (audio.timer) {
+    clearInterval(audio.timer);
+    audio.timer = null;
+  }
+}
+
+function startMusic() {
+  ensureAudio();
+  if (audio.ctx.state === 'suspended') audio.ctx.resume();
+  stopMusic();
+
+  // simple sequencer (positive / adventurous): I–V–vi–IV in G major
+  const bpm = 112;
+  const stepSec = 60 / bpm / 2; // 8th notes
+  const scale = {
+    G: 196.0,
+    A: 220.0,
+    B: 246.94,
+    C: 261.63,
+    D: 293.66,
+    E: 329.63,
+    Fsh: 369.99,
+  };
+  const chords = [
+    ['G', 'B', 'D'],
+    ['D', 'Fsh', 'A'],
+    ['E', 'G', 'B'],
+    ['C', 'E', 'G'],
+  ];
+
+  // melody pattern (8 steps) indexes into chord tones + passing notes
+  const melody = [0, 1, 2, 1, 0, 1, 2, 3];
+  const passing = ['A', 'B', 'C', 'D', 'E'];
+
+  function playTone(freq, when, dur, type, gain) {
+    const osc = audio.ctx.createOscillator();
+    const g = audio.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, when);
+
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(gain, when + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+
+    osc.connect(g);
+    g.connect(audio.master);
+    osc.start(when);
+    osc.stop(when + dur + 0.02);
+  }
+
+  function kick(when) {
+    // tiny kick
+    const o = audio.ctx.createOscillator();
+    const g = audio.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, when);
+    o.frequency.exponentialRampToValueAtTime(45, when + 0.08);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(0.20, when + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.10);
+    o.connect(g);
+    g.connect(audio.master);
+    o.start(when);
+    o.stop(when + 0.12);
+  }
+
+  function hat(when) {
+    // noise hat
+    const buf = audio.ctx.createBuffer(1, 4410, 44100);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.35;
+    const src = audio.ctx.createBufferSource();
+    src.buffer = buf;
+    const g = audio.ctx.createGain();
+    g.gain.setValueAtTime(0.06, when);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.03);
+    src.connect(g);
+    g.connect(audio.master);
+    src.start(when);
+    src.stop(when + 0.035);
+  }
+
+  const base = audio.ctx.currentTime + 0.05;
+  audio.t0 = base;
+
+  let step = 0;
+  audio.timer = setInterval(() => {
+    if (!audio.musicOn) return;
+    const t = audio.ctx.currentTime;
+    const lookahead = 0.18;
+
+    while (audio.t0 < t + lookahead) {
+      const chordIndex = Math.floor(step / 8) % chords.length;
+      const chord = chords[chordIndex];
+      const sInBar = step % 8;
+
+      // bass on beats
+      if (sInBar % 2 === 0) {
+        const root = chord[0];
+        playTone(scale[root] / 2, audio.t0, stepSec * 0.95, 'triangle', 0.10);
+      }
+
+      // pad-ish arpeggio
+      const arpNote = chord[sInBar % 3];
+      playTone(scale[arpNote], audio.t0, stepSec * 0.9, 'sawtooth', 0.035);
+
+      // melody (every other step)
+      if (sInBar % 2 === 0) {
+        let m = melody[sInBar];
+        let note;
+        if (m <= 2) note = chord[m];
+        else note = passing[(step + chordIndex) % passing.length];
+        playTone(scale[note] * 2, audio.t0, stepSec * 0.8, 'square', 0.02);
+      }
+
+      // light drums
+      if (sInBar === 0 || sInBar === 4) kick(audio.t0);
+      hat(audio.t0);
+
+      audio.t0 += stepSec;
+      step += 1;
+    }
+  }, 50);
+}
+
+function toggleMusic(on) {
+  audio.musicOn = (on !== undefined) ? !!on : !audio.musicOn;
+  setMusicLabel();
+  if (audio.musicOn) startMusic();
+  else stopMusic();
+}
 
 function formatTime(s) {
   const m = (s / 60) | 0;
@@ -467,6 +628,47 @@ const SPR = {
     px(g, 8, 8, 14, 1, 'rgba(0,0,0,.18)');
     px(g, 14, 8, 1, 14, 'rgba(0,0,0,.16)');
   }),
+
+  // --- decorations
+  bush: makeSprite(32, 32, (g) => {
+    px(g, 6, 16, 20, 12, '#1b5a33');
+    px(g, 8, 14, 16, 4, '#257445');
+    px(g, 10, 12, 12, 3, '#2d8a4f');
+    px(g, 12, 10, 8, 3, '#36a15f');
+    // outline bottom
+    px(g, 6, 28, 20, 1, 'rgba(0,0,0,.25)');
+  }),
+
+  flowers: makeSprite(32, 32, (g) => {
+    px(g, 0, 0, 32, 32, 'rgba(0,0,0,0)');
+    // petals
+    px(g, 10, 18, 2, 2, '#fff6dc');
+    px(g, 12, 18, 2, 2, '#f6c35c');
+    px(g, 18, 22, 2, 2, '#fff6dc');
+    px(g, 20, 22, 2, 2, '#f6c35c');
+    // stems
+    px(g, 11, 20, 1, 6, '#2d8a4f');
+    px(g, 19, 24, 1, 6, '#2d8a4f');
+  }),
+
+  rock: makeSprite(32, 32, (g) => {
+    px(g, 10, 18, 12, 10, '#485468');
+    px(g, 12, 16, 8, 4, '#556379');
+    px(g, 12, 20, 4, 2, '#6b7a92');
+    px(g, 20, 24, 2, 2, '#2b3342');
+    px(g, 10, 28, 12, 1, 'rgba(0,0,0,.25)');
+  }),
+
+  log: makeSprite(32, 32, (g) => {
+    px(g, 8, 20, 16, 8, '#7a4b22');
+    px(g, 8, 22, 16, 1, '#5d3517');
+    px(g, 8, 26, 16, 1, '#5d3517');
+    px(g, 7, 21, 1, 6, '#9b6a30');
+    px(g, 24, 21, 1, 6, '#9b6a30');
+    px(g, 9, 21, 2, 6, 'rgba(0,0,0,.10)');
+    px(g, 22, 21, 2, 6, 'rgba(0,0,0,.10)');
+    px(g, 8, 28, 16, 1, 'rgba(0,0,0,.25)');
+  }),
 };
 
 function tileKind(tx, ty) {
@@ -484,6 +686,50 @@ function tileKind(tx, ty) {
   if (cluster > 0.82 && (h & 7) === 0) return (h & 1) ? 'stoneA' : 'stoneB';
 
   return (h & 1) ? 'grassA' : 'grassB';
+}
+
+function decorKind(tx, ty) {
+  const h = hash2(tx, ty);
+  const tile = tileKind(tx, ty);
+  if (tile !== 'grassA' && tile !== 'grassB') return null;
+
+  // keep it sparse
+  const r = (h & 255) / 255;
+  if (r < 0.05) return 'bush';
+  if (r < 0.07) return 'flowers';
+  if (r < 0.09) return 'rock';
+  if (r < 0.105) return 'log';
+  return null;
+}
+
+function decorIsBlocking(kind) {
+  return kind === 'rock' || kind === 'log';
+}
+
+function decorRadius(kind) {
+  if (kind === 'rock') return 14;
+  if (kind === 'log') return 16;
+  if (kind === 'bush') return 18;
+  return 0;
+}
+
+function collidesObstacle(x, y, r) {
+  // sample around current tile neighborhood
+  const tileSize = 32;
+  const tx0 = Math.floor(x / tileSize);
+  const ty0 = Math.floor(y / tileSize);
+
+  for (let ty = ty0 - 1; ty <= ty0 + 1; ty++) {
+    for (let tx = tx0 - 1; tx <= tx0 + 1; tx++) {
+      const k = decorKind(tx, ty);
+      if (!k || !decorIsBlocking(k)) continue;
+      const cx = tx * tileSize + tileSize / 2;
+      const cy = ty * tileSize + tileSize / 2;
+      const rr = decorRadius(k);
+      if (dist(x, y, cx, cy) < r + rr) return true;
+    }
+  }
+  return false;
 }
 
 function drawSprite(img, sx, sy, { scale = 1, rot = 0, alpha = 1 } = {}) {
@@ -531,6 +777,66 @@ canvas.addEventListener('mousemove', (e) => {
 });
 canvas.addEventListener('mousedown', () => (mouse.down = true));
 canvas.addEventListener('mouseup', () => (mouse.down = false));
+
+// ---------- touch joystick
+const joy = {
+  active: false,
+  id: null,
+  cx: 0,
+  cy: 0,
+  x: 0,
+  y: 0,
+  dx: 0,
+  dy: 0,
+};
+
+function setJoy(dx, dy) {
+  joy.dx = clamp(dx, -1, 1);
+  joy.dy = clamp(dy, -1, 1);
+  if (ui.joyKnob) {
+    const max = 44;
+    ui.joyKnob.style.transform = `translate(calc(-50% + ${joy.dx * max}px), calc(-50% + ${joy.dy * max}px))`;
+  }
+}
+
+function resetJoy() {
+  joy.active = false;
+  joy.id = null;
+  setJoy(0, 0);
+}
+
+ui.joy?.addEventListener('pointerdown', (e) => {
+  joy.active = true;
+  joy.id = e.pointerId;
+  ui.joy.setPointerCapture(e.pointerId);
+  const r = ui.joy.getBoundingClientRect();
+  joy.cx = r.left + r.width / 2;
+  joy.cy = r.top + r.height / 2;
+  joy.x = e.clientX;
+  joy.y = e.clientY;
+  setJoy((joy.x - joy.cx) / 44, (joy.y - joy.cy) / 44);
+});
+ui.joy?.addEventListener('pointermove', (e) => {
+  if (!joy.active || e.pointerId !== joy.id) return;
+  joy.x = e.clientX;
+  joy.y = e.clientY;
+  setJoy((joy.x - joy.cx) / 44, (joy.y - joy.cy) / 44);
+});
+ui.joy?.addEventListener('pointerup', (e) => {
+  if (e.pointerId !== joy.id) return;
+  resetJoy();
+});
+ui.joy?.addEventListener('pointercancel', resetJoy);
+
+ui.pauseBtn?.addEventListener('click', () => {
+  paused = !paused;
+  if (!paused) requestAnimationFrame(loop);
+});
+
+ui.musicBtn?.addEventListener('click', () => {
+  toggleMusic();
+});
+setMusicLabel();
 
 // ---------- game state
 const state = {
@@ -778,13 +1084,23 @@ function updatePlayer(dt) {
   if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
   if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
 
+  // touch joystick overrides/adds
+  dx += joy.dx;
+  dy += joy.dy;
+
   player.moving = !!(dx || dy);
   if (player.moving) {
     const [nx, ny] = norm(dx, dy);
     player.dir = dirFromVec(nx, ny);
     player.anim += dt;
-    player.x += nx * player.speed * dt;
-    player.y += ny * player.speed * dt;
+
+    // tentative move (collision w/ obstacles)
+    const nxp = player.x + nx * player.speed * dt;
+    const nyp = player.y + ny * player.speed * dt;
+    if (!collidesObstacle(nxp, nyp, player.r)) {
+      player.x = nxp;
+      player.y = nyp;
+    }
   } else {
     player.anim = 0;
   }
@@ -1541,6 +1857,15 @@ function draw() {
       const sx = tx * tileSize - state.camera.x;
       const sy = ty * tileSize - state.camera.y;
       ctx.drawImage(tile, sx, sy, tileSize, tileSize);
+
+      // decorations (bush/flowers/rocks/logs)
+      const dk = decorKind(tx, ty);
+      if (dk) {
+        const img = SPR[dk];
+        const ox = ((hash2(tx, ty) >>> 8) & 7) - 3;
+        const oy = ((hash2(tx, ty) >>> 12) & 7) - 3;
+        ctx.drawImage(img, sx + ox, sy + oy, tileSize, tileSize);
+      }
     }
   }
 
@@ -1855,6 +2180,11 @@ function resetRun() {
 function startGame() {
   if (state.mode !== 'start') return;
   ui.start.style.display = 'none';
+
+  // Audio autoplay policy: start only on user gesture.
+  // Default ON for a nicer first impression.
+  toggleMusic(true);
+
   resetRun();
   state.t0 = performance.now();
   last = state.t0;

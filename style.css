@@ -91,3 +91,70 @@ body{
 .choice .t{font-weight:700}
 .choice .d{color:var(--muted); font-size:12px; margin-top:6px; line-height:1.4}
 .hint{margin-top:10px; color:var(--muted); font-size:12px}
+
+.miniBtn{
+  appearance:none;
+  border:1px solid rgba(246,195,92,.35);
+  background: rgba(0,0,0,.20);
+  color:var(--text);
+  padding:6px 10px;
+  border-radius:12px;
+  font-weight:800;
+  cursor:pointer;
+  font-size:12px;
+}
+.miniBtn:hover{border-color:rgba(246,195,92,.9)}
+
+/* Touch controls (mobile) */
+#touch{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+}
+.joy{
+  position:fixed;
+  left:18px;
+  bottom:22px;
+  width:132px;
+  height:132px;
+  pointer-events:auto;
+  touch-action:none;
+}
+.joyBase{
+  position:absolute;
+  inset:0;
+  border-radius:999px;
+  background:rgba(0,0,0,.20);
+  border:1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(6px);
+}
+.joyKnob{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:56px;
+  height:56px;
+  transform:translate(-50%,-50%);
+  border-radius:999px;
+  background:rgba(246,195,92,.18);
+  border:1px solid rgba(246,195,92,.55);
+}
+.touchBtn{
+  position:fixed;
+  right:18px;
+  bottom:28px;
+  pointer-events:auto;
+  touch-action:none;
+  appearance:none;
+  border:1px solid rgba(246,195,92,.55);
+  background: rgba(0,0,0,.20);
+  color:var(--text);
+  padding:10px 14px;
+  border-radius:14px;
+  font-weight:900;
+}
+
+/* Only show touch UI on coarse pointers */
+@media (pointer: fine) {
+  #touch{display:none}
+}

@@ -18,6 +18,7 @@
       <div><strong>LV</strong>: <span id="level">1</span> (<span id="xp">0</span>/<span id="xpNeed">0</span>)</div>
       <div><strong>Kills</strong>: <span id="kills">0</span></div>
       <div><strong>Time</strong>: <span id="time">0:00</span></div>
+      <button id="musicBtn" class="miniBtn" type="button" title="Toggle music">Music: OFF</button>
     </div>
     <div class="row small">
       <div>Move: WASD / Arrow Keys</div>
@@ -49,6 +50,14 @@
       <div id="choices"></div>
       <div class="hint">快捷鍵：1 / 2 / 3</div>
     </div>
+  </div>
+
+  <div id="touch" aria-hidden="true">
+    <div id="joy" class="joy">
+      <div class="joyBase"></div>
+      <div class="joyKnob"></div>
+    </div>
+    <button id="pauseBtn" class="touchBtn" type="button">Pause</button>
   </div>
 
   <script src="game.js"></script>
