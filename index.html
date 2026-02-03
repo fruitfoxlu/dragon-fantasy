@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VS-MVP (static)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="ui">
+    <div class="row">
+      <div><strong>HP</strong>: <span id="hp">-</span></div>
+      <div><strong>LV</strong>: <span id="level">1</span> (<span id="xp">0</span>/<span id="xpNeed">0</span>)</div>
+      <div><strong>Kills</strong>: <span id="kills">0</span></div>
+      <div><strong>Time</strong>: <span id="time">0:00</span></div>
+    </div>
+    <div class="row small">
+      <div>Move: WASD / Arrow Keys</div>
+      <div>Aim: mouse (for Bow)</div>
+      <div>Pause: P</div>
+    </div>
+  </div>
+
+  <canvas id="game" width="960" height="540"></canvas>
+
+  <div id="levelup" class="hidden" role="dialog" aria-modal="true" aria-label="Level up">
+    <div class="card">
+      <h2>升級！選 1 個</h2>
+      <div id="choices"></div>
+      <div class="hint">快捷鍵：1 / 2 / 3</div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
