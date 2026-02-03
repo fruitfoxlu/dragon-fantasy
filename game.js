@@ -48,6 +48,181 @@ function formatTime(s) {
   return `${m}:${String(r).padStart(2, '0')}`;
 }
 
+// ---------- pixel art (runtime sprites, GBA-ish 32x32)
+function makeSprite(w, h, drawFn) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  drawFn(g);
+  return c;
+}
+
+function px(g, x, y, w, h, color) {
+  g.fillStyle = color;
+  g.fillRect(x | 0, y | 0, w | 0, h | 0);
+}
+
+function outline(g, x, y, w, h, color) {
+  g.strokeStyle = color;
+  g.lineWidth = 1;
+  g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+}
+
+function hash2(ix, iy) {
+  // deterministic pseudo-random based on tile coords
+  let n = (ix * 374761393 + iy * 668265263) >>> 0;
+  n = (n ^ (n >>> 13)) >>> 0;
+  n = (n * 1274126177) >>> 0;
+  return (n ^ (n >>> 16)) >>> 0;
+}
+
+const SPR = {
+  hero: makeSprite(32, 32, (g) => {
+    // simple knight
+    px(g, 13, 4, 6, 4, '#f6c35c'); // helmet crest
+    px(g, 12, 6, 8, 7, '#cbd6e8'); // helm
+    px(g, 13, 8, 6, 4, '#1b2336'); // visor
+    px(g, 12, 13, 8, 6, '#8aa1c8'); // chest
+    px(g, 11, 18, 10, 6, '#607aa6'); // tunic
+    px(g, 9, 14, 3, 7, '#8aa1c8'); // left arm
+    px(g, 20, 14, 3, 7, '#8aa1c8'); // right arm
+    px(g, 12, 24, 4, 6, '#2a3a5b'); // left leg
+    px(g, 16, 24, 4, 6, '#2a3a5b'); // right leg
+    px(g, 11, 29, 5, 2, '#1a1a22'); // left boot
+    px(g, 16, 29, 5, 2, '#1a1a22'); // right boot
+    // shadow
+    px(g, 9, 30, 14, 1, 'rgba(0,0,0,.35)');
+  }),
+
+  skullMelee: makeSprite(32, 32, (g) => {
+    // skull
+    px(g, 12, 6, 8, 7, '#e9e6dd');
+    px(g, 13, 8, 2, 2, '#1a1a22');
+    px(g, 17, 8, 2, 2, '#1a1a22');
+    px(g, 15, 10, 2, 2, '#1a1a22');
+    px(g, 13, 12, 6, 2, '#d6d1c4');
+    // ribs
+    px(g, 11, 14, 10, 8, '#d9d4c7');
+    px(g, 12, 15, 8, 1, '#c2bcb0');
+    px(g, 12, 17, 8, 1, '#c2bcb0');
+    px(g, 12, 19, 8, 1, '#c2bcb0');
+    // arms
+    px(g, 8, 15, 3, 8, '#d9d4c7');
+    px(g, 21, 15, 3, 8, '#d9d4c7');
+    // legs
+    px(g, 12, 22, 4, 7, '#cfc9bc');
+    px(g, 16, 22, 4, 7, '#cfc9bc');
+    // tiny weapon
+    px(g, 6, 18, 2, 7, '#6b6b78');
+    px(g, 5, 18, 1, 2, '#f6c35c');
+    // shadow
+    px(g, 10, 30, 12, 1, 'rgba(0,0,0,.35)');
+  }),
+
+  skullRanger: makeSprite(32, 32, (g) => {
+    // skull
+    px(g, 12, 6, 8, 7, '#e9e6dd');
+    px(g, 13, 8, 2, 2, '#1a1a22');
+    px(g, 17, 8, 2, 2, '#1a1a22');
+    px(g, 15, 10, 2, 2, '#1a1a22');
+    px(g, 13, 12, 6, 2, '#d6d1c4');
+    // cloak
+    px(g, 10, 13, 12, 12, '#5a2131');
+    px(g, 12, 15, 8, 1, '#431624');
+    px(g, 12, 17, 8, 1, '#431624');
+    // legs
+    px(g, 12, 24, 4, 6, '#cfc9bc');
+    px(g, 16, 24, 4, 6, '#cfc9bc');
+    // bow
+    px(g, 22, 14, 1, 12, '#b5833e');
+    px(g, 21, 14, 1, 1, '#b5833e');
+    px(g, 23, 14, 1, 1, '#b5833e');
+    px(g, 21, 25, 1, 1, '#b5833e');
+    px(g, 23, 25, 1, 1, '#b5833e');
+    px(g, 22, 15, 1, 10, '#e9e6dd'); // string
+    // shadow
+    px(g, 10, 30, 12, 1, 'rgba(0,0,0,.35)');
+  }),
+
+  soul: makeSprite(12, 12, (g) => {
+    px(g, 5, 1, 2, 2, '#bffcf0');
+    px(g, 4, 3, 4, 4, '#7cf2d0');
+    px(g, 3, 5, 6, 5, 'rgba(124,242,208,.85)');
+    px(g, 4, 6, 1, 1, '#ffffff');
+  }),
+
+  chest: makeSprite(16, 16, (g) => {
+    px(g, 2, 6, 12, 8, '#7a4b22');
+    px(g, 2, 4, 12, 3, '#9b6a30');
+    px(g, 2, 8, 12, 1, '#5d3517');
+    px(g, 7, 7, 2, 2, '#f6c35c');
+    outline(g, 2, 4, 12, 10, 'rgba(0,0,0,.35)');
+  }),
+
+  blade: makeSprite(14, 14, (g) => {
+    px(g, 6, 1, 2, 10, '#d9d4c7');
+    px(g, 5, 2, 1, 8, '#bfc0ca');
+    px(g, 8, 2, 1, 8, '#bfc0ca');
+    px(g, 5, 10, 4, 2, '#6b4d2a');
+    px(g, 6, 12, 2, 1, '#f6c35c');
+  }),
+
+  orbTeal: makeSprite(10, 10, (g) => {
+    px(g, 4, 1, 2, 2, '#ffffff');
+    px(g, 3, 3, 4, 4, '#7cf2d0');
+    px(g, 2, 4, 6, 4, 'rgba(124,242,208,.85)');
+  }),
+
+  orbGold: makeSprite(10, 10, (g) => {
+    px(g, 4, 1, 2, 2, '#fff6dc');
+    px(g, 3, 3, 4, 4, '#f6c35c');
+    px(g, 2, 4, 6, 4, 'rgba(246,195,92,.85)');
+  }),
+
+  boneShot: makeSprite(10, 6, (g) => {
+    px(g, 1, 2, 8, 2, '#e9e6dd');
+    px(g, 0, 1, 2, 1, '#d6d1c4');
+    px(g, 0, 4, 2, 1, '#d6d1c4');
+    px(g, 8, 1, 2, 1, '#d6d1c4');
+    px(g, 8, 4, 2, 1, '#d6d1c4');
+  }),
+
+  tileA: makeSprite(32, 32, (g) => {
+    px(g, 0, 0, 32, 32, '#0a0f16');
+    // stone cracks
+    px(g, 2, 6, 10, 1, 'rgba(246,195,92,.10)');
+    px(g, 10, 6, 1, 9, 'rgba(246,195,92,.08)');
+    px(g, 16, 18, 12, 1, 'rgba(246,195,92,.08)');
+    px(g, 16, 10, 1, 10, 'rgba(246,195,92,.06)');
+    // edges
+    px(g, 0, 0, 32, 1, 'rgba(0,0,0,.35)');
+    px(g, 0, 0, 1, 32, 'rgba(0,0,0,.35)');
+  }),
+  tileB: makeSprite(32, 32, (g) => {
+    px(g, 0, 0, 32, 32, '#0b111a');
+    px(g, 4, 14, 12, 1, 'rgba(124,242,208,.08)');
+    px(g, 15, 14, 1, 8, 'rgba(124,242,208,.07)');
+    px(g, 20, 8, 8, 1, 'rgba(246,195,92,.06)');
+    px(g, 20, 8, 1, 10, 'rgba(246,195,92,.05)');
+    px(g, 0, 0, 32, 1, 'rgba(0,0,0,.35)');
+    px(g, 0, 0, 1, 32, 'rgba(0,0,0,.35)');
+  }),
+};
+
+function drawSprite(img, sx, sy, { scale = 1, rot = 0, alpha = 1 } = {}) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = alpha;
+  ctx.translate(sx, sy);
+  if (rot) ctx.rotate(rot);
+  const w = img.width * scale;
+  const h = img.height * scale;
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
 // ---------- input
 const keys = new Set();
 let mouse = { x: canvas.width / 2, y: canvas.height / 2, down: false };
@@ -1067,72 +1242,65 @@ function draw() {
   state.camera.x = player.x - canvas.width / 2;
   state.camera.y = player.y - canvas.height / 2;
 
-  // background grid (ancient tiles)
+  ctx.imageSmoothingEnabled = false;
+
+  // ---- pixel tile background (32x32)
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#070a10';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const tileSize = 32;
+  const startX = Math.floor(state.camera.x / tileSize) - 1;
+  const startY = Math.floor(state.camera.y / tileSize) - 1;
+  const endX = Math.floor((state.camera.x + canvas.width) / tileSize) + 1;
+  const endY = Math.floor((state.camera.y + canvas.height) / tileSize) + 1;
 
-  const grid = 56;
-  const ox = - (state.camera.x % grid);
-  const oy = - (state.camera.y % grid);
-  ctx.strokeStyle = 'rgba(246,195,92,.10)';
-  ctx.lineWidth = 1;
-  for (let x = ox; x < canvas.width; x += grid) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-  }
-  for (let y = oy; y < canvas.height; y += grid) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  for (let ty = startY; ty <= endY; ty++) {
+    for (let tx = startX; tx <= endX; tx++) {
+      const h = hash2(tx, ty);
+      const tile = (h & 1) ? SPR.tileA : SPR.tileB;
+      const sx = tx * tileSize - state.camera.x;
+      const sy = ty * tileSize - state.camera.y;
+      ctx.drawImage(tile, sx, sy, tileSize, tileSize);
+    }
   }
 
-  // effects: burn fields
+  // effects: burn fields (pixel ring)
   for (const fx of effects) {
     if (fx.type === 'burn') {
       const [sx, sy] = worldToScreen(fx.x, fx.y);
-      ctx.fillStyle = 'rgba(246,195,92,.08)';
+      ctx.save();
+      ctx.globalAlpha = 0.65;
+      ctx.strokeStyle = 'rgba(246,195,92,.35)';
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(sx, sy, fx.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(246,195,92,.22)';
       ctx.stroke();
+      ctx.restore();
     }
   }
 
   // gems (souls)
   for (const g of gems) {
     const [sx, sy] = worldToScreen(g.x, g.y);
-    ctx.fillStyle = 'rgba(124,242,208,.92)';
-    ctx.beginPath();
-    ctx.arc(sx, sy, g.r, 0, Math.PI * 2);
-    ctx.fill();
+    drawSprite(SPR.soul, sx, sy, { scale: 1, alpha: 0.98 });
   }
 
-  // bullets
+  // player bullets
   for (const b of bullets) {
     const [sx, sy] = worldToScreen(b.x, b.y);
-    ctx.fillStyle = b.color;
-    ctx.beginPath();
-    ctx.arc(sx, sy, b.r, 0, Math.PI * 2);
-    ctx.fill();
+    const isBow = b.color === '#f6c35c';
+    drawSprite(isBow ? SPR.orbGold : SPR.orbTeal, sx, sy, { scale: 1 });
   }
 
-  // enemy bullets
+  // enemy bullets (bone shard)
   for (const b of enemyBullets) {
     const [sx, sy] = worldToScreen(b.x, b.y);
-    ctx.fillStyle = 'rgba(255,130,130,.92)';
-    ctx.beginPath();
-    ctx.arc(sx, sy, b.r, 0, Math.PI * 2);
-    ctx.fill();
+    const rot = Math.atan2(b.vy, b.vx);
+    drawSprite(SPR.boneShot, sx, sy, { scale: 1, rot });
   }
 
   // chests
   for (const c of chests) {
     const [sx, sy] = worldToScreen(c.x, c.y);
-    ctx.fillStyle = 'rgba(246,195,92,.28)';
-    ctx.fillRect(sx - c.r, sy - c.r, c.r * 2, c.r * 2);
-    ctx.strokeStyle = 'rgba(246,195,92,.85)';
-    ctx.strokeRect(sx - c.r, sy - c.r, c.r * 2, c.r * 2);
-    ctx.fillStyle = 'rgba(0,0,0,.22)';
-    ctx.fillRect(sx - c.r + 3, sy - 2, c.r * 2 - 6, 4);
+    drawSprite(SPR.chest, sx, sy, { scale: 1 });
   }
 
   // orbit blades
@@ -1143,68 +1311,60 @@ function draw() {
       const bx = player.x + Math.cos(ang) * w.radius;
       const by = player.y + Math.sin(ang) * w.radius;
       const [sx, sy] = worldToScreen(bx, by);
-      ctx.fillStyle = 'rgba(246,195,92,.92)';
-      ctx.beginPath();
-      ctx.arc(sx, sy, w.bladeR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,.25)';
-      ctx.stroke();
+      drawSprite(SPR.blade, sx, sy, { scale: 1, rot: ang });
     }
   }
 
-  // enemies (shadows)
+  // enemies (skeletons)
   for (const e of enemies) {
     const [sx, sy] = worldToScreen(e.x, e.y);
     const frozen = state.elapsed < e.frozenUntil;
 
-    let color = 'rgba(180,45,65,.92)';
-    if (e.type === 'ranger') color = 'rgba(220,90,70,.92)';
-    if (e.elite) color = 'rgba(240,140,70,.92)';
-    if (frozen) color = 'rgba(120,190,255,.86)';
+    const base = (e.type === 'ranger') ? SPR.skullRanger : SPR.skullMelee;
+    const scale = e.elite ? 1.35 : 1.0;
+    const alpha = frozen ? 0.85 : 1;
+    drawSprite(base, sx, sy, { scale, alpha });
 
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(sx, sy, e.r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // tiny hp bar
-    const w = e.r * 2;
-    const hp01 = clamp(e.hp / 60, 0, 1);
-    ctx.fillStyle = 'rgba(0,0,0,.35)';
-    ctx.fillRect(sx - w / 2, sy - e.r - 10, w, 4);
-    ctx.fillStyle = 'rgba(246,195,92,.78)';
-    ctx.fillRect(sx - w / 2, sy - e.r - 10, w * hp01, 4);
-
-    // elite crown
+    // elite halo (pixel-ish)
     if (e.elite && !frozen) {
-      ctx.strokeStyle = 'rgba(246,195,92,.95)';
+      ctx.save();
+      ctx.strokeStyle = 'rgba(246,195,92,.85)';
       ctx.beginPath();
-      ctx.arc(sx, sy - e.r - 6, 5, 0, Math.PI * 2);
+      ctx.arc(sx, sy - 24 * scale, 6, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
     }
 
     // burn indicator
     if (state.elapsed < e.burnUntil) {
-      ctx.strokeStyle = 'rgba(246,195,92,.45)';
+      ctx.save();
+      ctx.strokeStyle = 'rgba(246,195,92,.35)';
       ctx.beginPath();
-      ctx.arc(sx, sy, e.r + 3, 0, Math.PI * 2);
+      ctx.arc(sx, sy, 18 * scale, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
     }
+
+    // tiny hp bar
+    const barW = 28 * scale;
+    const hp01 = clamp(e.hp / (e.elite ? 140 : 70), 0, 1);
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.fillRect(sx - barW / 2, sy - 26 * scale, barW, 4);
+    ctx.fillStyle = 'rgba(246,195,92,.78)';
+    ctx.fillRect(sx - barW / 2, sy - 26 * scale, barW * hp01, 4);
   }
 
   // player
   {
     const [sx, sy] = worldToScreen(player.x, player.y);
-    ctx.fillStyle = player.invuln > 0 ? 'rgba(255,255,255,.9)' : 'rgba(170,205,255,.95)';
-    ctx.beginPath();
-    ctx.arc(sx, sy, player.r, 0, Math.PI * 2);
-    ctx.fill();
+    const alpha = player.invuln > 0 ? 0.8 : 1;
+    drawSprite(SPR.hero, sx, sy, { scale: 1, alpha });
 
-    // bow aim indicator
+    // bow aim indicator (keep as subtle line)
     const worldMx = state.camera.x + mouse.x;
     const worldMy = state.camera.y + mouse.y;
     const [nx, ny] = norm(worldMx - player.x, worldMy - player.y);
-    ctx.strokeStyle = 'rgba(246,195,92,.55)';
+    ctx.strokeStyle = 'rgba(246,195,92,.28)';
     ctx.beginPath();
     ctx.moveTo(sx, sy);
     ctx.lineTo(sx + nx * 26, sy + ny * 26);
