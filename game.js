@@ -79,72 +79,285 @@ function hash2(ix, iy) {
 }
 
 const SPR = {
-  hero: makeSprite(32, 32, (g) => {
-    // simple knight
-    px(g, 13, 4, 6, 4, '#f6c35c'); // helmet crest
-    px(g, 12, 6, 8, 7, '#cbd6e8'); // helm
-    px(g, 13, 8, 6, 4, '#1b2336'); // visor
-    px(g, 12, 13, 8, 6, '#8aa1c8'); // chest
-    px(g, 11, 18, 10, 6, '#607aa6'); // tunic
-    px(g, 9, 14, 3, 7, '#8aa1c8'); // left arm
-    px(g, 20, 14, 3, 7, '#8aa1c8'); // right arm
-    px(g, 12, 24, 4, 6, '#2a3a5b'); // left leg
-    px(g, 16, 24, 4, 6, '#2a3a5b'); // right leg
-    px(g, 11, 29, 5, 2, '#1a1a22'); // left boot
-    px(g, 16, 29, 5, 2, '#1a1a22'); // right boot
-    // shadow
-    px(g, 9, 30, 14, 1, 'rgba(0,0,0,.35)');
-  }),
+  // 16-bit GBA-ish swordman (4 dirs x 4 frames)
+  hero: (() => {
+    const P = {
+      outline: '#0d0f16',
+      skin1: '#f2c9a0',
+      skin2: '#dba67b',
+      hair1: '#7a4b22',
+      hair2: '#5d3517',
+      cape1: '#2e7f6e',
+      cape2: '#1d5a4d',
+      tunic1: '#cbd6e8',
+      tunic2: '#8aa1c8',
+      pants: '#2a3a5b',
+      boot: '#1a1a22',
+      steel1: '#e7edf7',
+      steel2: '#a9b8d3',
+      gold: '#f6c35c',
+    };
 
-  skullMelee: makeSprite(32, 32, (g) => {
-    // skull
-    px(g, 12, 6, 8, 7, '#e9e6dd');
-    px(g, 13, 8, 2, 2, '#1a1a22');
-    px(g, 17, 8, 2, 2, '#1a1a22');
-    px(g, 15, 10, 2, 2, '#1a1a22');
-    px(g, 13, 12, 6, 2, '#d6d1c4');
-    // ribs
-    px(g, 11, 14, 10, 8, '#d9d4c7');
-    px(g, 12, 15, 8, 1, '#c2bcb0');
-    px(g, 12, 17, 8, 1, '#c2bcb0');
-    px(g, 12, 19, 8, 1, '#c2bcb0');
-    // arms
-    px(g, 8, 15, 3, 8, '#d9d4c7');
-    px(g, 21, 15, 3, 8, '#d9d4c7');
-    // legs
-    px(g, 12, 22, 4, 7, '#cfc9bc');
-    px(g, 16, 22, 4, 7, '#cfc9bc');
-    // tiny weapon
-    px(g, 6, 18, 2, 7, '#6b6b78');
-    px(g, 5, 18, 1, 2, '#f6c35c');
-    // shadow
-    px(g, 10, 30, 12, 1, 'rgba(0,0,0,.35)');
-  }),
+    function drawSword(g, dir, frame) {
+      // tiny sword position depends on dir
+      const wob = (frame === 1 ? 1 : frame === 3 ? -1 : 0);
+      if (dir === 2) { // right
+        px(g, 23 + wob, 15, 6, 1, P.steel1);
+        px(g, 23 + wob, 14, 1, 3, P.steel2);
+        px(g, 22 + wob, 15, 1, 1, P.gold);
+      } else if (dir === 1) { // left
+        px(g, 3 + wob, 15, 6, 1, P.steel1);
+        px(g, 8 + wob, 14, 1, 3, P.steel2);
+        px(g, 9 + wob, 15, 1, 1, P.gold);
+      } else if (dir === 0) { // down
+        px(g, 15, 20 + wob, 1, 7, P.steel1);
+        px(g, 14, 20 + wob, 1, 2, P.steel2);
+        px(g, 15, 19 + wob, 1, 1, P.gold);
+      } else { // up
+        px(g, 16, 7 + wob, 1, 7, P.steel1);
+        px(g, 17, 7 + wob, 1, 2, P.steel2);
+        px(g, 16, 14 + wob, 1, 1, P.gold);
+      }
+    }
 
-  skullRanger: makeSprite(32, 32, (g) => {
-    // skull
-    px(g, 12, 6, 8, 7, '#e9e6dd');
-    px(g, 13, 8, 2, 2, '#1a1a22');
-    px(g, 17, 8, 2, 2, '#1a1a22');
-    px(g, 15, 10, 2, 2, '#1a1a22');
-    px(g, 13, 12, 6, 2, '#d6d1c4');
-    // cloak
-    px(g, 10, 13, 12, 12, '#5a2131');
-    px(g, 12, 15, 8, 1, '#431624');
-    px(g, 12, 17, 8, 1, '#431624');
-    // legs
-    px(g, 12, 24, 4, 6, '#cfc9bc');
-    px(g, 16, 24, 4, 6, '#cfc9bc');
-    // bow
-    px(g, 22, 14, 1, 12, '#b5833e');
-    px(g, 21, 14, 1, 1, '#b5833e');
-    px(g, 23, 14, 1, 1, '#b5833e');
-    px(g, 21, 25, 1, 1, '#b5833e');
-    px(g, 23, 25, 1, 1, '#b5833e');
-    px(g, 22, 15, 1, 10, '#e9e6dd'); // string
-    // shadow
-    px(g, 10, 30, 12, 1, 'rgba(0,0,0,.35)');
-  }),
+    function drawBase(dir, frame) {
+      return makeSprite(32, 32, (g) => {
+        g.clearRect(0, 0, 32, 32);
+
+        const step = (frame === 1 ? 1 : frame === 3 ? -1 : 0);
+        const bob = (frame === 2 ? 1 : 0);
+
+        // cape (behind)
+        if (dir === 0) {
+          px(g, 10, 14 + bob, 12, 12, P.cape1);
+          px(g, 10, 20 + bob, 12, 2, P.cape2);
+        } else if (dir === 2) {
+          px(g, 9, 15 + bob, 10, 12, P.cape1);
+          px(g, 9, 22 + bob, 10, 2, P.cape2);
+        } else if (dir === 1) {
+          px(g, 13, 15 + bob, 10, 12, P.cape1);
+          px(g, 13, 22 + bob, 10, 2, P.cape2);
+        } else {
+          // up: cape less visible
+          px(g, 12, 16 + bob, 8, 8, P.cape2);
+        }
+
+        // head
+        if (dir === 3) {
+          // back of head (hair)
+          px(g, 12, 6 + bob, 8, 7, P.hair1);
+          px(g, 12, 11 + bob, 8, 2, P.hair2);
+        } else {
+          px(g, 12, 6 + bob, 8, 7, P.skin1);
+          px(g, 12, 6 + bob, 8, 2, P.hair1);
+          px(g, 12, 8 + bob, 8, 1, P.hair2);
+          // eyes (not for back view)
+          if (dir !== 3) {
+            px(g, 14, 10 + bob, 1, 1, P.outline);
+            px(g, 17, 10 + bob, 1, 1, P.outline);
+          }
+        }
+        // outline head
+        outline(g, 12, 6 + bob, 8, 7, P.outline);
+
+        // torso
+        px(g, 11, 13 + bob, 10, 8, P.tunic1);
+        px(g, 12, 16 + bob, 8, 2, P.tunic2);
+        // belt
+        px(g, 11, 19 + bob, 10, 1, P.boot);
+        px(g, 14, 19 + bob, 4, 1, P.gold);
+        outline(g, 11, 13 + bob, 10, 8, 'rgba(0,0,0,.28)');
+
+        // arms
+        const armY = 14 + bob;
+        if (dir === 2) {
+          px(g, 20, armY, 3, 7, P.tunic2);
+          px(g, 9, armY, 3, 7, P.tunic1);
+        } else if (dir === 1) {
+          px(g, 9, armY, 3, 7, P.tunic2);
+          px(g, 20, armY, 3, 7, P.tunic1);
+        } else {
+          px(g, 9, armY, 3, 7, P.tunic2);
+          px(g, 20, armY, 3, 7, P.tunic2);
+        }
+
+        // legs (stepping)
+        const legY = 21 + bob;
+        if (dir === 0) {
+          px(g, 12, legY, 4, 8, P.pants);
+          px(g, 16, legY, 4, 8, P.pants);
+          px(g, 12 + step, legY + 6, 4, 2, P.boot);
+          px(g, 16 - step, legY + 6, 4, 2, P.boot);
+        } else if (dir === 3) {
+          px(g, 12, legY, 4, 8, P.pants);
+          px(g, 16, legY, 4, 8, P.pants);
+          px(g, 12 + step, legY + 6, 4, 2, P.boot);
+          px(g, 16 - step, legY + 6, 4, 2, P.boot);
+        } else {
+          // side view
+          const fx = dir === 2 ? 15 : 13;
+          px(g, fx, legY, 5, 8, P.pants);
+          px(g, fx + step, legY + 6, 5, 2, P.boot);
+        }
+
+        // shadow
+        px(g, 10, 30, 12, 1, 'rgba(0,0,0,.35)');
+
+        // sword
+        drawSword(g, dir, frame);
+      });
+    }
+
+    const frames = Array.from({ length: 4 }, () => Array(4).fill(null));
+    for (let dir = 0; dir < 4; dir++) {
+      for (let f = 0; f < 4; f++) frames[dir][f] = drawBase(dir, f);
+    }
+    return frames;
+  })(),
+
+  skullMelee: (() => {
+    const P = {
+      outline: '#0d0f16',
+      bone1: '#efece3',
+      bone2: '#d6d1c4',
+      bone3: '#bdb7ab',
+      cloth1: '#5b3b55',
+      cloth2: '#40273b',
+      steel: '#a9b8d3',
+      gold: '#f6c35c',
+    };
+
+    function frame(dir, f) {
+      return makeSprite(32, 32, (g) => {
+        const step = (f === 1 ? 1 : f === 3 ? -1 : 0);
+        const bob = (f === 2 ? 1 : 0);
+
+        // cloak rag
+        if (dir !== 3) {
+          px(g, 10, 14 + bob, 12, 10, P.cloth1);
+          px(g, 10, 20 + bob, 12, 2, P.cloth2);
+        }
+
+        // skull
+        px(g, 12, 6 + bob, 8, 7, P.bone1);
+        px(g, 13, 8 + bob, 2, 2, P.outline);
+        px(g, 17, 8 + bob, 2, 2, P.outline);
+        px(g, 15, 10 + bob, 2, 2, P.outline);
+        px(g, 13, 12 + bob, 6, 2, P.bone2);
+        outline(g, 12, 6 + bob, 8, 7, P.outline);
+
+        // torso / ribs
+        px(g, 11, 14 + bob, 10, 8, P.bone2);
+        px(g, 12, 15 + bob, 8, 1, P.bone3);
+        px(g, 12, 17 + bob, 8, 1, P.bone3);
+        px(g, 12, 19 + bob, 8, 1, P.bone3);
+
+        // arms
+        if (dir === 2) {
+          px(g, 20, 15 + bob, 4, 7, P.bone2);
+          px(g, 8, 15 + bob, 3, 7, P.bone2);
+        } else if (dir === 1) {
+          px(g, 8, 15 + bob, 4, 7, P.bone2);
+          px(g, 21, 15 + bob, 3, 7, P.bone2);
+        } else {
+          px(g, 8, 15 + bob, 3, 7, P.bone2);
+          px(g, 21, 15 + bob, 3, 7, P.bone2);
+        }
+
+        // legs
+        px(g, 12, 22 + bob, 4, 7, P.bone2);
+        px(g, 16, 22 + bob, 4, 7, P.bone2);
+        px(g, 12 + step, 28 + bob, 4, 2, P.bone3);
+        px(g, 16 - step, 28 + bob, 4, 2, P.bone3);
+
+        // weapon: rusty spear/axe hint
+        if (dir === 2) {
+          px(g, 25, 16 + bob, 2, 10, P.steel);
+          px(g, 24, 15 + bob, 4, 2, P.gold);
+        } else if (dir === 1) {
+          px(g, 5, 16 + bob, 2, 10, P.steel);
+          px(g, 4, 15 + bob, 4, 2, P.gold);
+        } else {
+          px(g, 15, 20 + bob, 1, 9, P.steel);
+          px(g, 14, 20 + bob, 3, 1, P.gold);
+        }
+
+        // shadow
+        px(g, 10, 30, 12, 1, 'rgba(0,0,0,.35)');
+      });
+    }
+
+    const frames = Array.from({ length: 4 }, () => Array(4).fill(null));
+    for (let dir = 0; dir < 4; dir++) for (let f = 0; f < 4; f++) frames[dir][f] = frame(dir, f);
+    return frames;
+  })(),
+
+  skullRanger: (() => {
+    const P = {
+      outline: '#0d0f16',
+      bone1: '#efece3',
+      bone2: '#d6d1c4',
+      bone3: '#bdb7ab',
+      cloth1: '#7a2c2c',
+      cloth2: '#512020',
+      wood1: '#b5833e',
+      wood2: '#7a4b22',
+      gold: '#f6c35c',
+    };
+
+    function frame(dir, f) {
+      return makeSprite(32, 32, (g) => {
+        const step = (f === 1 ? 1 : f === 3 ? -1 : 0);
+        const bob = (f === 2 ? 1 : 0);
+
+        // cloak
+        px(g, 10, 13 + bob, 12, 12, P.cloth1);
+        px(g, 10, 20 + bob, 12, 2, P.cloth2);
+
+        // skull
+        px(g, 12, 6 + bob, 8, 7, P.bone1);
+        px(g, 13, 8 + bob, 2, 2, P.outline);
+        px(g, 17, 8 + bob, 2, 2, P.outline);
+        px(g, 15, 10 + bob, 2, 2, P.outline);
+        px(g, 13, 12 + bob, 6, 2, P.bone2);
+        outline(g, 12, 6 + bob, 8, 7, P.outline);
+
+        // torso
+        px(g, 11, 14 + bob, 10, 7, P.bone2);
+        px(g, 12, 15 + bob, 8, 1, P.bone3);
+        px(g, 12, 17 + bob, 8, 1, P.bone3);
+
+        // legs
+        px(g, 12, 22 + bob, 4, 7, P.bone2);
+        px(g, 16, 22 + bob, 4, 7, P.bone2);
+        px(g, 12 + step, 28 + bob, 4, 2, P.bone3);
+        px(g, 16 - step, 28 + bob, 4, 2, P.bone3);
+
+        // bow
+        const wob = (f === 1 ? 1 : f === 3 ? -1 : 0);
+        if (dir === 1) {
+          px(g, 6 + wob, 14 + bob, 1, 12, P.wood1);
+          px(g, 5 + wob, 14 + bob, 1, 2, P.wood2);
+          px(g, 7 + wob, 24 + bob, 1, 2, P.wood2);
+          px(g, 6 + wob, 15 + bob, 1, 10, P.bone1); // string
+          px(g, 7 + wob, 19 + bob, 1, 1, P.gold);
+        } else {
+          px(g, 25 + wob, 14 + bob, 1, 12, P.wood1);
+          px(g, 24 + wob, 14 + bob, 1, 2, P.wood2);
+          px(g, 26 + wob, 24 + bob, 1, 2, P.wood2);
+          px(g, 25 + wob, 15 + bob, 1, 10, P.bone1);
+          px(g, 24 + wob, 19 + bob, 1, 1, P.gold);
+        }
+
+        // shadow
+        px(g, 10, 30, 12, 1, 'rgba(0,0,0,.35)');
+      });
+    }
+
+    const frames = Array.from({ length: 4 }, () => Array(4).fill(null));
+    for (let dir = 0; dir < 4; dir++) for (let f = 0; f < 4; f++) frames[dir][f] = frame(dir, f);
+    return frames;
+  })(),
 
   soul: makeSprite(12, 12, (g) => {
     px(g, 5, 1, 2, 2, '#bffcf0');
@@ -278,6 +491,9 @@ const player = {
   xp: 0,
   xpNeed: 10,
   magnet: 70,
+  dir: 0,      // 0 down, 1 left, 2 right, 3 up
+  moving: false,
+  anim: 0,
 };
 
 // weapon model:
@@ -430,6 +646,8 @@ function spawnEnemy() {
 
     type,
     elite,
+    dir: 0,
+    anim: rand(0, 10),
     shootCd: rand(0.2, 1.0),
     shootBase: elite ? 1.15 : 1.45,
     shootSpeed: elite ? 420 : 380,
@@ -486,17 +704,29 @@ function damageEnemy(e, amount) {
   e.hp -= amount;
 }
 
+function dirFromVec(dx, dy) {
+  if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 2 : 1;
+  return dy > 0 ? 0 : 3;
+}
+
 function updatePlayer(dt) {
   let dx = 0, dy = 0;
   if (keys.has('KeyW') || keys.has('ArrowUp')) dy -= 1;
   if (keys.has('KeyS') || keys.has('ArrowDown')) dy += 1;
   if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
   if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
-  if (dx || dy) {
+
+  player.moving = !!(dx || dy);
+  if (player.moving) {
     const [nx, ny] = norm(dx, dy);
+    player.dir = dirFromVec(nx, ny);
+    player.anim += dt;
     player.x += nx * player.speed * dt;
     player.y += ny * player.speed * dt;
+  } else {
+    player.anim = 0;
   }
+
   player.invuln = Math.max(0, player.invuln - dt);
 }
 
@@ -1320,10 +1550,17 @@ function draw() {
     const [sx, sy] = worldToScreen(e.x, e.y);
     const frozen = state.elapsed < e.frozenUntil;
 
+    // face movement direction
+    const dx = player.x - e.x;
+    const dy = player.y - e.y;
+    e.dir = dirFromVec(dx, dy);
+    e.anim = (e.anim || 0) + (frozen ? 0 : 0.016);
+    const f = frozen ? 0 : (Math.floor(e.anim * 8) % 4);
+
     const base = (e.type === 'ranger') ? SPR.skullRanger : SPR.skullMelee;
     const scale = e.elite ? 1.35 : 1.0;
-    const alpha = frozen ? 0.85 : 1;
-    drawSprite(base, sx, sy, { scale, alpha });
+    const alpha = frozen ? 0.75 : 1;
+    drawSprite(base[e.dir][f], sx, sy, { scale, alpha });
 
     // elite halo (pixel-ish)
     if (e.elite && !frozen) {
@@ -1358,7 +1595,8 @@ function draw() {
   {
     const [sx, sy] = worldToScreen(player.x, player.y);
     const alpha = player.invuln > 0 ? 0.8 : 1;
-    drawSprite(SPR.hero, sx, sy, { scale: 1, alpha });
+    const f = player.moving ? (Math.floor(player.anim * 10) % 4) : 0;
+    drawSprite(SPR.hero[player.dir][f], sx, sy, { scale: 1, alpha });
 
     // bow aim indicator (keep as subtle line)
     const worldMx = state.camera.x + mouse.x;
