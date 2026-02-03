@@ -797,7 +797,8 @@ function decorKind(tx, ty) {
 }
 
 function decorIsBlocking(kind) {
-  return kind === 'rock' || kind === 'log';
+  // No blocking obstacles: focus on dodging mobs and collecting loot.
+  return false;
 }
 
 function decorRadius(kind) {
@@ -808,21 +809,7 @@ function decorRadius(kind) {
 }
 
 function collidesObstacle(x, y, r) {
-  // sample around current tile neighborhood
-  const tileSize = 32;
-  const tx0 = Math.floor(x / tileSize);
-  const ty0 = Math.floor(y / tileSize);
-
-  for (let ty = ty0 - 1; ty <= ty0 + 1; ty++) {
-    for (let tx = tx0 - 1; tx <= tx0 + 1; tx++) {
-      const k = decorKind(tx, ty);
-      if (!k || !decorIsBlocking(k)) continue;
-      const cx = tx * tileSize + tileSize / 2;
-      const cy = ty * tileSize + tileSize / 2;
-      const rr = decorRadius(k);
-      if (dist(x, y, cx, cy) < r + rr) return true;
-    }
-  }
+  // Disabled: nothing blocks player movement.
   return false;
 }
 
@@ -945,6 +932,8 @@ const state = {
   mode: 'start', // start | play | levelup | dead
   kills: 0,
   camera: { x: 0, y: 0 },
+
+  nextBossAt: 150,
 };
 
 const player = {
@@ -1060,8 +1049,11 @@ const effects = [];
 // - meteor {type:'meteor', x,y, t, ttl, delay, radius, stage:'fall'|'impact'}
 // - burn {type:'burn', x,y, t, ttl, radius, dps}
 // - wave {type:'wave', x,y, t, ttl, r0, r1}
+// - boss_tell / elite_tell (charge telegraph)
+// - boss_slam_warn / boss_slam (AoE warning + damage)
 
 function spawnEnemy() {
+
   const margin = 80;
   const w = canvas.width, h = canvas.height;
   const side = (Math.random() * 4) | 0;
@@ -1094,8 +1086,8 @@ function spawnEnemy() {
 
   if (elite) {
     r *= 1.35;
-    hp *= 2.1;
-    speed *= 0.92;
+    hp *= 3.0;
+    speed *= 0.90;
   }
 
   enemies.push({
@@ -1120,7 +1112,59 @@ function spawnEnemy() {
     shootBase: elite ? 1.15 : 1.45,
     shootSpeed: elite ? 420 : 380,
     shootDmg: elite ? 14 : 10,
+
+    // elite/boss skill timers
+    chargeCd: elite ? rand(3.0, 5.0) : 0,
+    chargeT: 0,
+    chargeVx: 0,
+    chargeVy: 0,
+    slamCd: 0,
   });
+}
+
+function spawnBoss() {
+  // Big Boss: tougher, unique attacks, better loot.
+  const margin = 120;
+  const w = canvas.width, h = canvas.height;
+  const side = (Math.random() * 4) | 0;
+  let sx = 0, sy = 0;
+  const px = player.x, py = player.y;
+
+  if (side === 0) { sx = px + rand(-w / 2, w / 2); sy = py - h / 2 - margin; }
+  if (side === 1) { sx = px + w / 2 + margin; sy = py + rand(-h / 2, h / 2); }
+  if (side === 2) { sx = px + rand(-w / 2, w / 2); sy = py + h / 2 + margin; }
+  if (side === 3) { sx = px - w / 2 - margin; sy = py + rand(-h / 2, h / 2); }
+
+  const boss = {
+    x: sx,
+    y: sy,
+    r: 44,
+    hp: 1200 + state.elapsed * 3.2,
+    speed: 95,
+    touchDmg: 28,
+    vx: 0,
+    vy: 0,
+    frozenUntil: 0,
+    burnUntil: 0,
+    burnDps: 0,
+    bladeHitCd: 0,
+
+    type: 'boss',
+    elite: true,
+    dir: 0,
+    anim: 0,
+
+    // boss skills
+    chargeCd: 3.0,
+    chargeT: 0,
+    chargeVx: 0,
+    chargeVy: 0,
+    slamCd: 5.0,
+    slamWindup: 0,
+    summonCd: 7.5,
+  };
+
+  enemies.push(boss);
 }
 
 function fireBullet(fromX, fromY, dirX, dirY, spec) {
@@ -1160,9 +1204,19 @@ function killEnemyAt(index) {
     gems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 6, xp: baseXp });
   }
 
-  // elite: chance to drop a treasure chest
-  if (e.elite && Math.random() < 0.70) {
+  // loot
+  if (e.type === 'boss') {
+    // Big Boss always drops big rewards.
+    for (let k = 0; k < 3; k++) {
+      chests.push({ x: e.x + rand(-22, 22), y: e.y + rand(-22, 22), r: 12 });
+    }
+    for (let k = 0; k < 10; k++) {
+      gems.push({ x: e.x + rand(-28, 28), y: e.y + rand(-28, 28), r: 6, xp: baseXp * 2 });
+    }
+  } else if (e.elite) {
+    // Elite: guaranteed chest + extra chance.
     chests.push({ x: e.x, y: e.y, r: 12 });
+    if (Math.random() < 0.35) chests.push({ x: e.x + rand(-14, 14), y: e.y + rand(-14, 14), r: 12 });
   }
 
   enemies.splice(index, 1);
@@ -1474,14 +1528,119 @@ function updateEnemies(dt) {
 
     const frozen = now < e.frozenUntil;
 
-    // movement (melee chases, ranger kites)
+    // movement + skills
     if (!frozen) {
       const dx = player.x - e.x;
       const dy = player.y - e.y;
       const d = Math.hypot(dx, dy);
       const [nx, ny] = norm(dx, dy);
 
-      if (e.type === 'ranger') {
+      if (e.type === 'boss') {
+        // --- Big Boss AI (no bullets): charge / slam / summon
+        e.chargeCd = Math.max(0, e.chargeCd - dt);
+        e.slamCd = Math.max(0, e.slamCd - dt);
+        e.summonCd = Math.max(0, e.summonCd - dt);
+
+        if (e.chargeT > 0) {
+          // charging
+          e.x += e.chargeVx * dt;
+          e.y += e.chargeVy * dt;
+          e.chargeT -= dt;
+        } else {
+          // choose action
+          if (e.slamWindup > 0) {
+            e.slamWindup -= dt;
+            if (e.slamWindup <= 0) {
+              // slam: damaging shock ring around boss
+              effects.push({ type: 'boss_slam', x: e.x, y: e.y, t: 0, ttl: 0.45, radius: 170 });
+              e.slamCd = 6.5;
+            }
+          } else if (e.chargeCd <= 0 && d < 520) {
+            // charge with short tell
+            effects.push({ type: 'boss_tell', x: e.x, y: e.y, t: 0, ttl: 0.55, dx, dy });
+            const [cx, cy] = norm(dx, dy);
+            e.chargeVx = cx * 520;
+            e.chargeVy = cy * 520;
+            e.chargeT = 0.55;
+            e.chargeCd = 4.2;
+          } else if (e.slamCd <= 0 && d < 260) {
+            // slam windup
+            effects.push({ type: 'boss_slam_warn', x: e.x, y: e.y, t: 0, ttl: 0.55, radius: 170 });
+            e.slamWindup = 0.55;
+          } else if (e.summonCd <= 0) {
+            // summon a small pack
+            for (let k = 0; k < 6; k++) {
+              enemies.push({
+                x: e.x + rand(-80, 80),
+                y: e.y + rand(-80, 80),
+                r: 14,
+                hp: 45 + (state.elapsed / 2),
+                speed: 120,
+                touchDmg: 12,
+                vx: 0,
+                vy: 0,
+                frozenUntil: 0,
+                burnUntil: 0,
+                burnDps: 0,
+                bladeHitCd: 0,
+                type: 'melee',
+                elite: false,
+                dir: 0,
+                anim: rand(0, 10),
+                shootCd: 0,
+                shootBase: 0,
+                shootSpeed: 0,
+                shootDmg: 0,
+                chargeCd: 0,
+                chargeT: 0,
+                chargeVx: 0,
+                chargeVy: 0,
+                slamCd: 0,
+              });
+            }
+            e.summonCd = 9.5;
+          }
+
+          // default chase
+          e.x += nx * e.speed * dt;
+          e.y += ny * e.speed * dt;
+        }
+      } else if (e.elite) {
+        // --- Elite skill: occasional charge (no bullets)
+        e.chargeCd = Math.max(0, (e.chargeCd || 0) - dt);
+        if (e.chargeT > 0) {
+          e.x += e.chargeVx * dt;
+          e.y += e.chargeVy * dt;
+          e.chargeT -= dt;
+        } else {
+          if (e.chargeCd <= 0 && d < 380) {
+            effects.push({ type: 'elite_tell', x: e.x, y: e.y, t: 0, ttl: 0.35, dx, dy });
+            const [cx, cy] = norm(dx, dy);
+            e.chargeVx = cx * 440;
+            e.chargeVy = cy * 440;
+            e.chargeT = 0.35;
+            e.chargeCd = rand(3.5, 6.0);
+          }
+
+          // chase
+          if (e.type === 'ranger') {
+            // prefer mid distance, no bullets
+            if (d > 280) {
+              e.x += nx * e.speed * dt;
+              e.y += ny * e.speed * dt;
+            } else if (d < 190) {
+              e.x -= nx * e.speed * dt;
+              e.y -= ny * e.speed * dt;
+            } else {
+              e.x += (-ny) * (e.speed * 0.25) * dt;
+              e.y += (nx) * (e.speed * 0.25) * dt;
+            }
+          } else {
+            e.x += nx * e.speed * dt;
+            e.y += ny * e.speed * dt;
+          }
+        }
+      } else if (e.type === 'ranger') {
         // prefer mid distance
         if (d > 280) {
           e.x += nx * e.speed * dt;
@@ -1494,22 +1653,6 @@ function updateEnemies(dt) {
           e.x += (-ny) * (e.speed * 0.25) * dt;
           e.y += (nx) * (e.speed * 0.25) * dt;
         }
-
-        // ranged shot (disabled for now: no enemy bullets)
-        // e.shootCd = Math.max(0, e.shootCd - dt);
-        // if (e.shootCd <= 0 && d < 520) {
-        //   const [sx, sy] = norm(dx, dy);
-        //   enemyBullets.push({
-        //     x: e.x,
-        //     y: e.y,
-        //     vx: sx * e.shootSpeed,
-        //     vy: sy * e.shootSpeed,
-        //     r: 5,
-        //     dmg: e.shootDmg,
-        //     life: 2.2,
-        //   });
-        //   e.shootCd = e.shootBase + rand(-0.15, 0.15);
-        // }
       } else {
         // melee
         e.x += nx * e.speed * dt;
@@ -1528,10 +1671,10 @@ function updateEnemies(dt) {
     if (d2 < e.r + player.r) {
       if (player.invuln <= 0) {
         player.hp -= e.touchDmg;
-        player.invuln = 0.55;
+        player.invuln = (e.type === 'boss') ? 0.70 : 0.55;
         const [nx, ny] = norm(player.x - e.x, player.y - e.y);
-        player.x += nx * 14;
-        player.y += ny * 14;
+        player.x += nx * (e.type === 'boss' ? 26 : 14);
+        player.y += ny * (e.type === 'boss' ? 26 : 14);
       }
     }
 
@@ -1626,6 +1769,21 @@ function updateEffects(dt) {
             // freeze
             e.frozenUntil = Math.max(e.frozenUntil, now + w.freezeSec);
           }
+        }
+      }
+    }
+
+    // boss/elite telegraphs + AoE
+    if (fx.type === 'boss_slam') {
+      // damage player if inside radius early in the effect
+      if (fx.t < 0.08) {
+        const d = dist(fx.x, fx.y, player.x, player.y);
+        if (d <= fx.radius + player.r && player.invuln <= 0) {
+          player.hp -= 34;
+          player.invuln = 0.65;
+          const [nx, ny] = norm(player.x - fx.x, player.y - fx.y);
+          player.x += nx * 34;
+          player.y += ny * 34;
         }
       }
     }
@@ -2131,6 +2289,30 @@ function draw() {
       ctx.stroke();
       ctx.lineWidth = 1;
     }
+
+    if (fx.type === 'boss_tell' || fx.type === 'elite_tell') {
+      const [sx, sy] = worldToScreen(fx.x, fx.y);
+      const [nx, ny] = norm(fx.dx, fx.dy);
+      const a = 1 - fx.t / fx.ttl;
+      ctx.strokeStyle = fx.type === 'boss_tell' ? `rgba(246,80,80,${0.7 * a})` : `rgba(246,195,92,${0.7 * a})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + nx * 120, sy + ny * 120);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
+    if (fx.type === 'boss_slam_warn' || fx.type === 'boss_slam') {
+      const [sx, sy] = worldToScreen(fx.x, fx.y);
+      const a = 1 - fx.t / fx.ttl;
+      ctx.strokeStyle = fx.type === 'boss_slam' ? `rgba(246,80,80,${0.55 * a})` : `rgba(246,195,92,${0.6 * a})`;
+      ctx.lineWidth = fx.type === 'boss_slam' ? 6 : 3;
+      ctx.beginPath();
+      ctx.arc(sx, sy, fx.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
   }
 
   // overlays
@@ -2191,6 +2373,13 @@ function loop(now) {
       if (Math.random() < 0.15) spawnEnemy();
     }
 
+    // Boss spawn
+    const bossAlive = enemies.some(e => e.type === 'boss');
+    if (!bossAlive && state.elapsed >= state.nextBossAt) {
+      spawnBoss();
+      state.nextBossAt += 150;
+    }
+
     updateWeapons(dt);
     updateBullets(dt);
     collideBullets();
@@ -2216,6 +2405,7 @@ function resetRun() {
 
   state.elapsed = 0;
   state.kills = 0;
+  state.nextBossAt = 150;
 
   // spawn at a tile center so camera feels centered and joystick is stable
   player.x = 16;
