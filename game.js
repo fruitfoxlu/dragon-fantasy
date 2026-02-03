@@ -693,12 +693,16 @@ function decorKind(tx, ty) {
   const tile = tileKind(tx, ty);
   if (tile !== 'grassA' && tile !== 'grassB') return null;
 
-  // keep it sparse
+  // Keep spawn area clear (so camera feels centered and you don't get stuck).
+  // Spawn is near (0,0) tile.
+  if (Math.abs(tx) <= 4 && Math.abs(ty) <= 4) return null;
+
+  // much sparser + fewer blocking obstacles (simpler gameplay)
   const r = (h & 255) / 255;
-  if (r < 0.05) return 'bush';
-  if (r < 0.07) return 'flowers';
-  if (r < 0.09) return 'rock';
-  if (r < 0.105) return 'log';
+  if (r < 0.04) return 'bush';
+  if (r < 0.055) return 'flowers';
+  if (r < 0.060) return 'rock';
+  if (r < 0.064) return 'log';
   return null;
 }
 
@@ -2115,8 +2119,9 @@ function resetRun() {
   state.elapsed = 0;
   state.kills = 0;
 
-  player.x = 0;
-  player.y = 0;
+  // spawn at a tile center so camera feels centered and joystick is stable
+  player.x = 16;
+  player.y = 16;
   player.hpMax = 100;
   player.hp = 100;
   player.speed = 220;
