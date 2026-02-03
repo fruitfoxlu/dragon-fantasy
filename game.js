@@ -921,8 +921,7 @@ ui.langBtn?.addEventListener('click', () => {
   setLang(lang === 'zh' ? 'en' : 'zh');
 });
 
-// init language
-setLang(lang);
+// init language (deferred until after state init to avoid ReferenceError)
 
 
 // ---------- game state
@@ -2494,6 +2493,9 @@ function startGame() {
 }
 
 ui.startBtn?.addEventListener('click', startGame);
+
+// init language (safe now)
+setLang(lang);
 
 // initial render
 paused = true;
