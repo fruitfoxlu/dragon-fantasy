@@ -2366,7 +2366,12 @@ function loop(now) {
 
     // spawn pacing ramps up
     enemySpawnAcc += dt;
-    const spawnRate = Math.max(0.14, 0.55 - state.elapsed / 180);
+    // Spawn pacing: every 60s, spawn speed +50% (i.e., interval * 2/3).
+    const minute = Math.floor(state.elapsed / 60);
+    const speedMul = Math.pow(1.5, minute);
+    const spawnRateBase = Math.max(0.14, 0.55 - state.elapsed / 180);
+    const spawnRate = Math.max(0.06, spawnRateBase / speedMul);
+
     while (enemySpawnAcc > spawnRate) {
       enemySpawnAcc -= spawnRate;
       spawnEnemy();
