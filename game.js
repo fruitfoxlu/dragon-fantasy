@@ -17,6 +17,8 @@ const ui = {
   xpNeed: document.getElementById('xpNeed'),
   kills: document.getElementById('kills'),
   time: document.getElementById('time'),
+  start: document.getElementById('start'),
+  startBtn: document.getElementById('startBtn'),
   levelup: document.getElementById('levelup'),
   choices: document.getElementById('choices'),
 };
@@ -43,6 +45,12 @@ let mouse = { x: canvas.width / 2, y: canvas.height / 2, down: false };
 let paused = false;
 
 window.addEventListener('keydown', (e) => {
+  // start screen
+  if (state.mode === 'start') {
+    if (e.code === 'Enter' || e.code === 'Space') startGame();
+    return;
+  }
+
   if (e.code === 'KeyP') {
     paused = !paused;
     if (!paused) requestAnimationFrame(loop);
@@ -70,7 +78,7 @@ canvas.addEventListener('mouseup', () => (mouse.down = false));
 const state = {
   t0: performance.now(),
   elapsed: 0, // seconds
-  mode: 'play', // play | levelup | dead
+  mode: 'start', // start | play | levelup | dead
   kills: 0,
   camera: { x: 0, y: 0 },
 };
@@ -91,7 +99,7 @@ const player = {
 
 const weapons = {
   wand: {
-    name: 'Wand',
+    name: 'Arcane Wand',
     kind: 'auto',
     enabled: true,
     cd: 0,
@@ -103,7 +111,7 @@ const weapons = {
     pierce: 0,
   },
   bow: {
-    name: 'Bow',
+    name: 'Dragon Bow',
     kind: 'mouse',
     enabled: false,
     cd: 0,
@@ -151,7 +159,7 @@ function fireBullet(fromX, fromY, dirX, dirY, spec) {
     dmg: spec.damage,
     pierce: spec.pierce,
     life: 1.6,
-    color: spec.kind === 'mouse' ? '#ffd36e' : '#6ee7ff',
+    color: spec.kind === 'mouse' ? '#f6c35c' : '#7cf2d0',
   });
 }
 
@@ -311,56 +319,56 @@ function checkLevelUp() {
 const UPGRADE_POOL = [
   {
     id: 'wand_rate',
-    title: 'Wand: 攻速 +15%',
-    desc: '自動瞄準武器更快發射。',
+    title: 'Arcane Wand：施法速度 +15%',
+    desc: '魔杖更快自動鎖定與連發。',
     apply() { weapons.wand.baseCooldown *= 0.85; }
   },
   {
     id: 'wand_dmg',
-    title: 'Wand: 傷害 +25%',
-    desc: '每發傷害更高。',
+    title: 'Arcane Wand：傷害 +25%',
+    desc: '每發法術更痛。',
     apply() { weapons.wand.damage = Math.round(weapons.wand.damage * 1.25); }
   },
   {
     id: 'wand_proj',
-    title: 'Wand: 額外投射物 +1',
-    desc: '同時多打一發（有散射）。',
+    title: 'Arcane Wand：額外飛彈 +1',
+    desc: '同時多打一發（散射）。',
     apply() { weapons.wand.projectiles += 1; }
   },
   {
     id: 'unlock_bow',
-    title: '解鎖 Bow（滑鼠瞄準）',
-    desc: '新增第二把武器：朝滑鼠射箭。',
+    title: '解鎖 Dragon Bow（滑鼠瞄準）',
+    desc: '獲得第二把武器：朝滑鼠方向射出龍焰箭。',
     apply() { weapons.bow.enabled = true; }
   },
   {
     id: 'bow_rate',
-    title: 'Bow: 攻速 +15%',
-    desc: '滑鼠瞄準武器更快發射。',
+    title: 'Dragon Bow：拉弓速度 +15%',
+    desc: '射得更快，控場更強。',
     apply() { weapons.bow.baseCooldown *= 0.85; }
   },
   {
     id: 'bow_dmg',
-    title: 'Bow: 傷害 +25%',
-    desc: '每發更痛，適合打高血怪。',
+    title: 'Dragon Bow：傷害 +25%',
+    desc: '對高血怪更有效。',
     apply() { weapons.bow.damage = Math.round(weapons.bow.damage * 1.25); }
   },
   {
     id: 'hp',
-    title: '最大 HP +20',
-    desc: '容錯更高。',
+    title: '體魄：最大 HP +20',
+    desc: '更耐打，容錯更高。',
     apply() { player.hpMax += 20; player.hp += 20; }
   },
   {
     id: 'speed',
-    title: '移動速度 +10%',
-    desc: '更容易走位。',
+    title: '敏捷：移動速度 +10%',
+    desc: '更容易走位與風箏。',
     apply() { player.speed *= 1.10; }
   },
   {
     id: 'magnet',
-    title: '拾取範圍 +25',
-    desc: '更容易吸到經驗球。',
+    title: '龍之召喚：拾取範圍 +25',
+    desc: '更容易吸到經驗之魂。',
     apply() { player.magnet += 25; }
   },
 ];
@@ -420,15 +428,15 @@ function draw() {
   state.camera.x = player.x - canvas.width / 2;
   state.camera.y = player.y - canvas.height / 2;
 
-  // background grid
+  // background grid (ancient tiles)
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#070a16';
+  ctx.fillStyle = '#070a10';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const grid = 48;
+  const grid = 56;
   const ox = - (state.camera.x % grid);
   const oy = - (state.camera.y % grid);
-  ctx.strokeStyle = 'rgba(255,255,255,.06)';
+  ctx.strokeStyle = 'rgba(246,195,92,.10)';
   ctx.lineWidth = 1;
   for (let x = ox; x < canvas.width; x += grid) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
@@ -437,10 +445,10 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
   }
 
-  // gems
+  // gems (souls)
   for (const g of gems) {
     const [sx, sy] = worldToScreen(g.x, g.y);
-    ctx.fillStyle = 'rgba(110,231,255,.9)';
+    ctx.fillStyle = 'rgba(124,242,208,.92)';
     ctx.beginPath();
     ctx.arc(sx, sy, g.r, 0, Math.PI * 2);
     ctx.fill();
@@ -455,10 +463,10 @@ function draw() {
     ctx.fill();
   }
 
-  // enemies
+  // enemies (shadows)
   for (const e of enemies) {
     const [sx, sy] = worldToScreen(e.x, e.y);
-    ctx.fillStyle = 'rgba(255,90,90,.92)';
+    ctx.fillStyle = 'rgba(180,45,65,.92)';
     ctx.beginPath();
     ctx.arc(sx, sy, e.r, 0, Math.PI * 2);
     ctx.fill();
@@ -468,7 +476,7 @@ function draw() {
     const hp01 = clamp(e.hp / 60, 0, 1);
     ctx.fillStyle = 'rgba(0,0,0,.35)';
     ctx.fillRect(sx - w / 2, sy - e.r - 10, w, 4);
-    ctx.fillStyle = 'rgba(110,231,255,.8)';
+    ctx.fillStyle = 'rgba(246,195,92,.78)';
     ctx.fillRect(sx - w / 2, sy - e.r - 10, w * hp01, 4);
   }
 
@@ -495,19 +503,20 @@ function draw() {
   if (paused && state.mode === 'play') {
     ctx.fillStyle = 'rgba(0,0,0,.35)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.fillStyle = 'rgba(246,195,92,.92)';
     ctx.font = '20px system-ui';
-    ctx.fillText('Paused (P to resume)', 18, 34);
+    ctx.fillText('Paused (press P)', 18, 34);
   }
 
   if (state.mode === 'dead') {
-    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillStyle = 'rgba(0,0,0,.62)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.fillStyle = 'rgba(246,195,92,.95)';
     ctx.font = '28px system-ui';
-    ctx.fillText('Game Over', 18, 44);
+    ctx.fillText('Fallen Hero', 18, 44);
+    ctx.fillStyle = 'rgba(243,241,231,.92)';
     ctx.font = '16px system-ui';
-    ctx.fillText('Reload the page to try again.', 18, 72);
+    ctx.fillText('Reload to begin a new legend.', 18, 72);
   }
 }
 
@@ -561,6 +570,57 @@ function loop(now) {
   if (state.mode !== 'dead') requestAnimationFrame(loop);
 }
 
-// start with a few enemies
-for (let i = 0; i < 6; i++) spawnEnemy();
-requestAnimationFrame(loop);
+function resetRun() {
+  bullets.length = 0;
+  enemies.length = 0;
+  gems.length = 0;
+
+  state.elapsed = 0;
+  state.kills = 0;
+
+  player.x = 0;
+  player.y = 0;
+  player.hpMax = 100;
+  player.hp = 100;
+  player.speed = 220;
+  player.invuln = 0;
+  player.level = 1;
+  player.xp = 0;
+  player.xpNeed = 10;
+  player.magnet = 70;
+
+  weapons.wand.enabled = true;
+  weapons.wand.baseCooldown = 0.45;
+  weapons.wand.damage = 12;
+  weapons.wand.projectiles = 1;
+  weapons.wand.pierce = 0;
+
+  weapons.bow.enabled = false;
+  weapons.bow.baseCooldown = 0.8;
+  weapons.bow.damage = 18;
+  weapons.bow.projectiles = 1;
+  weapons.bow.pierce = 1;
+
+  enemySpawnAcc = 0;
+}
+
+function startGame() {
+  if (state.mode !== 'start') return;
+  ui.start.style.display = 'none';
+  resetRun();
+  state.t0 = performance.now();
+  last = state.t0;
+  state.mode = 'play';
+  paused = false;
+
+  // start with a few enemies
+  for (let i = 0; i < 6; i++) spawnEnemy();
+  requestAnimationFrame(loop);
+}
+
+ui.startBtn?.addEventListener('click', startGame);
+
+// initial render on start screen
+paused = true;
+draw();
+updateUI();

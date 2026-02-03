@@ -3,11 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>VS-MVP (static)</title>
+  <title>Dragon Fantasy</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="ui">
+    <div class="titleRow">
+      <div class="title">Dragon Fantasy</div>
+      <div class="subtitle">Survive the horde. Grow your legend.</div>
+    </div>
+
     <div class="row">
       <div><strong>HP</strong>: <span id="hp">-</span></div>
       <div><strong>LV</strong>: <span id="level">1</span> (<span id="xp">0</span>/<span id="xpNeed">0</span>)</div>
@@ -16,12 +21,27 @@
     </div>
     <div class="row small">
       <div>Move: WASD / Arrow Keys</div>
-      <div>Aim: mouse (for Bow)</div>
+      <div>Aim: mouse (Bow)</div>
       <div>Pause: P</div>
     </div>
   </div>
 
   <canvas id="game" width="960" height="540"></canvas>
+
+  <div id="start" role="dialog" aria-modal="true" aria-label="Start game">
+    <div class="card">
+      <h1 class="hero">Dragon Fantasy</h1>
+      <div class="heroSub">在黑暗中撐住，升級你的武器與能力。</div>
+      <ul class="bullets">
+        <li><strong>WASD/方向鍵</strong> 移動</li>
+        <li><strong>Wand</strong> 自動瞄準最近敵人</li>
+        <li><strong>Bow</strong> 朝滑鼠方向射（升級解鎖）</li>
+        <li><strong>P</strong> 暫停</li>
+      </ul>
+      <button id="startBtn" class="btn">Start Adventure</button>
+      <div class="hint">快捷鍵：Enter / Space</div>
+    </div>
+  </div>
 
   <div id="levelup" class="hidden" role="dialog" aria-modal="true" aria-label="Level up">
     <div class="card">

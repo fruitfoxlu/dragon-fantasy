@@ -1,15 +1,20 @@
 :root{
-  --bg:#0b1020;
-  --panel:rgba(0,0,0,.35);
-  --text:#e8eefc;
-  --muted:#a8b3d9;
-  --accent:#6ee7ff;
+  --bg:#070a10;
+  --panel:rgba(0,0,0,.40);
+  --text:#f3f1e7;
+  --muted:#c4bfae;
+  --accent:#f6c35c; /* gold */
+  --accent2:#7cf2d0; /* teal */
 }
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
   margin:0;
-  background: radial-gradient(1200px 600px at 30% 20%, #18224a 0%, var(--bg) 55%, #050714 100%);
+  background:
+    radial-gradient(900px 520px at 25% 18%, rgba(246,195,92,.18) 0%, rgba(0,0,0,0) 60%),
+    radial-gradient(1000px 620px at 80% 25%, rgba(124,242,208,.12) 0%, rgba(0,0,0,0) 55%),
+    radial-gradient(1200px 700px at 50% 85%, rgba(90,20,20,.20) 0%, rgba(0,0,0,0) 60%),
+    linear-gradient(180deg, #04060c 0%, var(--bg) 60%, #02030a 100%);
   color:var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   overflow:hidden;
@@ -27,32 +32,52 @@ body{
   left:50%;
   transform:translateX(-50%);
   width:min(980px, calc(100% - 16px));
-  padding:10px 12px;
-  background:var(--panel);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:12px;
+  padding:12px 14px;
+  background:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.22));
+  border:1px solid rgba(246,195,92,.22);
+  border-radius:14px;
   backdrop-filter: blur(10px);
 }
+.titleRow{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:6px; flex-wrap:wrap}
+.title{font-weight:800; letter-spacing:.3px; font-size:18px; color:var(--accent)}
+.subtitle{color:var(--muted); font-size:12px}
 .row{display:flex; gap:14px; justify-content:space-between; flex-wrap:wrap}
 .small{color:var(--muted); font-size:12px}
 
+#start,
 #levelup{
   position:fixed;
   inset:0;
   display:flex;
   align-items:center;
   justify-content:center;
-  background:rgba(0,0,0,.55);
+  background:rgba(0,0,0,.62);
 }
 #levelup.hidden{display:none}
 .card{
-  width:min(720px, calc(100% - 24px));
-  background:rgba(12,16,34,.92);
-  border:1px solid rgba(255,255,255,.14);
-  border-radius:16px;
+  width:min(760px, calc(100% - 24px));
+  background:linear-gradient(180deg, rgba(16,14,10,.94), rgba(10,12,22,.92));
+  border:1px solid rgba(246,195,92,.22);
+  border-radius:18px;
   padding:18px;
+  box-shadow: 0 30px 90px rgba(0,0,0,.45);
 }
 .card h2{margin:0 0 12px; font-size:20px}
+.hero{margin:0 0 6px; font-size:28px; letter-spacing:.5px; color:var(--accent)}
+.heroSub{color:var(--muted); margin-bottom:12px}
+.bullets{margin:0 0 14px; padding-left:18px; color:var(--text)}
+.bullets li{margin:6px 0; color:rgba(243,241,231,.92)}
+.btn{
+  appearance:none;
+  border:1px solid rgba(246,195,92,.55);
+  background: linear-gradient(180deg, rgba(246,195,92,.22), rgba(246,195,92,.06));
+  color:var(--text);
+  padding:10px 14px;
+  border-radius:14px;
+  font-weight:800;
+  cursor:pointer;
+}
+.btn:hover{border-color:rgba(246,195,92,.9)}
 #choices{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px}
 .choice{
   padding:12px;
@@ -62,7 +87,7 @@ body{
   cursor:pointer;
   min-height:96px;
 }
-.choice:hover{border-color:rgba(110,231,255,.6)}
+.choice:hover{border-color:rgba(246,195,92,.8)}
 .choice .t{font-weight:700}
 .choice .d{color:var(--muted); font-size:12px; margin-top:6px; line-height:1.4}
 .hint{margin-top:10px; color:var(--muted); font-size:12px}
