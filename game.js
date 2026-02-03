@@ -402,27 +402,89 @@ const SPR = {
     px(g, 8, 4, 2, 1, '#d6d1c4');
   }),
 
-  tileA: makeSprite(32, 32, (g) => {
-    px(g, 0, 0, 32, 32, '#0a0f16');
-    // stone cracks
-    px(g, 2, 6, 10, 1, 'rgba(246,195,92,.10)');
-    px(g, 10, 6, 1, 9, 'rgba(246,195,92,.08)');
-    px(g, 16, 18, 12, 1, 'rgba(246,195,92,.08)');
-    px(g, 16, 10, 1, 10, 'rgba(246,195,92,.06)');
-    // edges
-    px(g, 0, 0, 32, 1, 'rgba(0,0,0,.35)');
-    px(g, 0, 0, 1, 32, 'rgba(0,0,0,.35)');
+  // --- Forest adventure tiles
+  grassA: makeSprite(32, 32, (g) => {
+    px(g, 0, 0, 32, 32, '#1f6b3a');
+    // subtle texture
+    px(g, 2, 5, 2, 1, '#2d8a4f');
+    px(g, 10, 9, 2, 1, '#2d8a4f');
+    px(g, 20, 14, 2, 1, '#2d8a4f');
+    px(g, 26, 22, 2, 1, '#2d8a4f');
+    px(g, 6, 20, 1, 1, '#174a28');
+    px(g, 15, 24, 1, 1, '#174a28');
+    // tiny flowers
+    if ((hash2(1, 7) & 3) === 1) {
+      px(g, 24, 10, 1, 1, '#fff6dc');
+      px(g, 25, 10, 1, 1, '#f6c35c');
+    }
   }),
-  tileB: makeSprite(32, 32, (g) => {
-    px(g, 0, 0, 32, 32, '#0b111a');
-    px(g, 4, 14, 12, 1, 'rgba(124,242,208,.08)');
-    px(g, 15, 14, 1, 8, 'rgba(124,242,208,.07)');
-    px(g, 20, 8, 8, 1, 'rgba(246,195,92,.06)');
-    px(g, 20, 8, 1, 10, 'rgba(246,195,92,.05)');
-    px(g, 0, 0, 32, 1, 'rgba(0,0,0,.35)');
-    px(g, 0, 0, 1, 32, 'rgba(0,0,0,.35)');
+  grassB: makeSprite(32, 32, (g) => {
+    px(g, 0, 0, 32, 32, '#216f3d');
+    px(g, 4, 12, 2, 1, '#2d8a4f');
+    px(g, 14, 6, 2, 1, '#2d8a4f');
+    px(g, 22, 18, 2, 1, '#2d8a4f');
+    px(g, 28, 26, 2, 1, '#2d8a4f');
+    px(g, 8, 24, 1, 1, '#174a28');
+    px(g, 18, 28, 1, 1, '#174a28');
+  }),
+  pathA: makeSprite(32, 32, (g) => {
+    px(g, 0, 0, 32, 32, '#6b4d2a');
+    px(g, 0, 0, 32, 32, 'rgba(0,0,0,.08)');
+    // lighter sand highlights
+    px(g, 3, 8, 6, 2, '#8a6a3a');
+    px(g, 18, 12, 9, 2, '#8a6a3a');
+    px(g, 7, 22, 8, 2, '#8a6a3a');
+    // pebbles
+    px(g, 10, 16, 2, 2, '#3b2b18');
+    px(g, 24, 24, 2, 2, '#3b2b18');
+  }),
+  pathB: makeSprite(32, 32, (g) => {
+    px(g, 0, 0, 32, 32, '#644626');
+    px(g, 0, 0, 32, 32, 'rgba(0,0,0,.08)');
+    px(g, 6, 10, 10, 2, '#87633a');
+    px(g, 12, 20, 12, 2, '#87633a');
+    px(g, 22, 6, 6, 2, '#87633a');
+    px(g, 8, 26, 2, 2, '#3b2b18');
+  }),
+  stoneA: makeSprite(32, 32, (g) => {
+    px(g, 0, 0, 32, 32, '#3c4658');
+    // slab edges
+    px(g, 0, 0, 32, 1, 'rgba(0,0,0,.30)');
+    px(g, 0, 0, 1, 32, 'rgba(0,0,0,.30)');
+    px(g, 0, 31, 32, 1, 'rgba(255,255,255,.06)');
+    px(g, 31, 0, 1, 32, 'rgba(255,255,255,.06)');
+    // cracks
+    px(g, 6, 12, 12, 1, 'rgba(0,0,0,.20)');
+    px(g, 18, 12, 1, 10, 'rgba(0,0,0,.18)');
+    px(g, 12, 22, 10, 1, 'rgba(0,0,0,.14)');
+  }),
+  stoneB: makeSprite(32, 32, (g) => {
+    px(g, 0, 0, 32, 32, '#364152');
+    px(g, 0, 0, 32, 1, 'rgba(0,0,0,.30)');
+    px(g, 0, 0, 1, 32, 'rgba(0,0,0,.30)');
+    px(g, 0, 31, 32, 1, 'rgba(255,255,255,.06)');
+    px(g, 31, 0, 1, 32, 'rgba(255,255,255,.06)');
+    px(g, 8, 8, 14, 1, 'rgba(0,0,0,.18)');
+    px(g, 14, 8, 1, 14, 'rgba(0,0,0,.16)');
   }),
 };
+
+function tileKind(tx, ty) {
+  // Two winding paths + occasional stone ruins patches.
+  const h = hash2(tx, ty);
+
+  const y1 = Math.floor(ty * 0.55 + Math.sin(tx * 0.28) * 3);
+  const y2 = Math.floor(ty * 0.45 + Math.sin(tx * 0.22 + 2.2) * 4);
+  const onPath = (Math.abs(ty - y1) <= 1) || (Math.abs(ty - y2) <= 1);
+
+  if (onPath) return (h & 1) ? 'pathA' : 'pathB';
+
+  // ruins: clustered stones
+  const cluster = ((hash2((tx / 3) | 0, (ty / 3) | 0) & 255) / 255);
+  if (cluster > 0.82 && (h & 7) === 0) return (h & 1) ? 'stoneA' : 'stoneB';
+
+  return (h & 1) ? 'grassA' : 'grassB';
+}
 
 function drawSprite(img, sx, sy, { scale = 1, rot = 0, alpha = 1 } = {}) {
   ctx.save();
@@ -948,25 +1010,7 @@ function updateBullets(dt) {
     if (b.life <= 0) bullets.splice(i, 1);
   }
 
-  for (let i = enemyBullets.length - 1; i >= 0; i--) {
-    const b = enemyBullets[i];
-    b.x += b.vx * dt;
-    b.y += b.vy * dt;
-    b.life -= dt;
-
-    // hit player
-    const d = dist(b.x, b.y, player.x, player.y);
-    if (d < b.r + player.r) {
-      if (player.invuln <= 0) {
-        player.hp -= b.dmg;
-        player.invuln = 0.45;
-      }
-      enemyBullets.splice(i, 1);
-      continue;
-    }
-
-    if (b.life <= 0) enemyBullets.splice(i, 1);
-  }
+  // enemy bullets disabled
 }
 
 function collideBullets() {
@@ -1027,21 +1071,21 @@ function updateEnemies(dt) {
           e.y += (nx) * (e.speed * 0.25) * dt;
         }
 
-        // ranged shot
-        e.shootCd = Math.max(0, e.shootCd - dt);
-        if (e.shootCd <= 0 && d < 520) {
-          const [sx, sy] = norm(dx, dy);
-          enemyBullets.push({
-            x: e.x,
-            y: e.y,
-            vx: sx * e.shootSpeed,
-            vy: sy * e.shootSpeed,
-            r: 5,
-            dmg: e.shootDmg,
-            life: 2.2,
-          });
-          e.shootCd = e.shootBase + rand(-0.15, 0.15);
-        }
+        // ranged shot (disabled for now: no enemy bullets)
+        // e.shootCd = Math.max(0, e.shootCd - dt);
+        // if (e.shootCd <= 0 && d < 520) {
+        //   const [sx, sy] = norm(dx, dy);
+        //   enemyBullets.push({
+        //     x: e.x,
+        //     y: e.y,
+        //     vx: sx * e.shootSpeed,
+        //     vy: sy * e.shootSpeed,
+        //     r: 5,
+        //     dmg: e.shootDmg,
+        //     life: 2.2,
+        //   });
+        //   e.shootCd = e.shootBase + rand(-0.15, 0.15);
+        // }
       } else {
         // melee
         e.x += nx * e.speed * dt;
@@ -1484,8 +1528,8 @@ function draw() {
 
   for (let ty = startY; ty <= endY; ty++) {
     for (let tx = startX; tx <= endX; tx++) {
-      const h = hash2(tx, ty);
-      const tile = (h & 1) ? SPR.tileA : SPR.tileB;
+      const kind = tileKind(tx, ty);
+      const tile = SPR[kind];
       const sx = tx * tileSize - state.camera.x;
       const sy = ty * tileSize - state.camera.y;
       ctx.drawImage(tile, sx, sy, tileSize, tileSize);
@@ -1520,12 +1564,7 @@ function draw() {
     drawSprite(isBow ? SPR.orbGold : SPR.orbTeal, sx, sy, { scale: 1 });
   }
 
-  // enemy bullets (bone shard)
-  for (const b of enemyBullets) {
-    const [sx, sy] = worldToScreen(b.x, b.y);
-    const rot = Math.atan2(b.vy, b.vx);
-    drawSprite(SPR.boneShot, sx, sy, { scale: 1, rot });
-  }
+  // enemy bullets disabled
 
   // chests
   for (const c of chests) {
