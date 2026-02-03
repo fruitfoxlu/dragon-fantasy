@@ -1131,9 +1131,9 @@ function spawnEnemy() {
   }
 
   if (elite) {
-    r *= 3.0;
+    r *= 5.0;
     hp *= 3.0;
-    speed *= 0.72;
+    speed *= 0.70;
   }
 
   enemies.push({
@@ -2361,7 +2361,7 @@ function draw() {
     const f = frozen ? 0 : (Math.floor(e.anim * 8) % 4);
 
     const base = (e.type === 'ranger') ? SPR.skullRanger : SPR.skullMelee;
-    const scale = e.elite ? 3.0 : 1.0;
+    const scale = e.elite ? 5.0 : 1.0;
     const alpha = frozen ? 0.75 : 1;
 
     // Elite visual: add a golden helmet overlay + glowing eyes
@@ -2373,13 +2373,13 @@ function draw() {
       ctx.translate(sx, sy);
       // helmet (pixel blocks)
       ctx.fillStyle = 'rgba(246,195,92,.95)';
-      ctx.fillRect(-8 * scale/3, -20 * scale/3, 16 * scale/3, 6 * scale/3);
-      ctx.fillRect(-10 * scale/3, -18 * scale/3, 4 * scale/3, 4 * scale/3);
-      ctx.fillRect(6 * scale/3, -18 * scale/3, 4 * scale/3, 4 * scale/3);
+      ctx.fillRect(-14 * scale/5, -34 * scale/5, 28 * scale/5, 10 * scale/5);
+      ctx.fillRect(-18 * scale/5, -30 * scale/5, 7 * scale/5, 7 * scale/5);
+      ctx.fillRect(11 * scale/5, -30 * scale/5, 7 * scale/5, 7 * scale/5);
       // eyes glow
       ctx.fillStyle = 'rgba(124,242,208,.9)';
-      ctx.fillRect(-4 * scale/3, -10 * scale/3, 2 * scale/3, 2 * scale/3);
-      ctx.fillRect(2 * scale/3, -10 * scale/3, 2 * scale/3, 2 * scale/3);
+      ctx.fillRect(-7 * scale/5, -18 * scale/5, 4 * scale/5, 4 * scale/5);
+      ctx.fillRect(3 * scale/5, -18 * scale/5, 4 * scale/5, 4 * scale/5);
       ctx.restore();
     }
 
@@ -2418,6 +2418,14 @@ function draw() {
     const alpha = player.invuln > 0 ? 0.8 : 1;
     const f = player.moving ? (Math.floor(player.anim * 10) % 4) : 0;
     drawSprite(SPR.hero[player.dir][f], sx, sy, { scale: 1, alpha });
+
+    // HP bar above hero
+    const hp01 = clamp(player.hp / player.hpMax, 0, 1);
+    const barW = 36;
+    ctx.fillStyle = 'rgba(0,0,0,.45)';
+    ctx.fillRect(sx - barW / 2, sy - 34, barW, 5);
+    ctx.fillStyle = `rgba(${Math.round(80 + 175 * (1 - hp01))}, ${Math.round(200 * hp01)}, 90, .95)`;
+    ctx.fillRect(sx - barW / 2, sy - 34, barW * hp01, 5);
 
     // forward aim indicator (subtle)
     const [nx, ny] = forwardVec(player.dir);
