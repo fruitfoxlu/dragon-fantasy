@@ -869,7 +869,10 @@ let mouse = { x: canvas.width / 2, y: canvas.height / 2, down: false };
 let paused = false;
 
 // balance knobs
-const XP_MULT = 0.5; // slow leveling by 50%
+// Leveling curve: easy to reach Lv5, then slows down.
+function xpGainMul(level) {
+  return level < 5 ? 1.0 : 0.5;
+}
 
 window.addEventListener('keydown', (e) => {
   if (state.mode === 'start') {
@@ -1244,7 +1247,7 @@ function killEnemyAt(index) {
   state.kills++;
 
   // drop gem(s)
-  const baseXp = (4 + ((state.elapsed / 45) | 0)) * XP_MULT;
+  const baseXp = (4 + ((state.elapsed / 45) | 0)) * xpGainMul(player.level);
   const drops = e.elite ? 3 : 1;
   for (let i = 0; i < drops; i++) {
     gems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 6, xp: baseXp });
@@ -1893,7 +1896,12 @@ function checkLevelUp() {
   while (player.xp >= player.xpNeed && state.mode === 'play') {
     player.xp -= player.xpNeed;
     player.level += 1;
-    player.xpNeed = Math.floor(10 + player.level * 7 + Math.pow(player.level, 1.25));
+    // XP needed: fast early, then ramps harder.
+    if (player.level < 5) {
+      player.xpNeed = Math.floor(8 + player.level * 6);
+    } else {
+      player.xpNeed = Math.floor((10 + player.level * 7 + Math.pow(player.level, 1.25)) * 1.25);
+    }
     openLevelUp();
   }
 }
@@ -1910,7 +1918,7 @@ const CHEST_POOL = [
     id: 'chest_xp',
     title: { zh: '靈魂洪流：獲得大量經驗', en: 'Soul Surge: Gain Lots of XP' },
     desc: { zh: '立即獲得 +40 XP（可能直接再升級）。', en: 'Gain +40 XP immediately (may trigger another level-up).' },
-    apply() { player.xp += 40 * XP_MULT; checkLevelUp(); }
+    apply() { player.xp += 40 * xpGainMul(player.level); checkLevelUp(); }
   },
   {
     id: 'chest_allcdr',
