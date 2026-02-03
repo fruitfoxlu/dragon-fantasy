@@ -26,6 +26,7 @@ const ui = {
   kills: document.getElementById('kills'),
   time: document.getElementById('time'),
   musicBtn: document.getElementById('musicBtn'),
+  langBtn: document.getElementById('langBtn'),
   start: document.getElementById('start'),
   startBtn: document.getElementById('startBtn'),
   levelup: document.getElementById('levelup'),
@@ -55,9 +56,98 @@ let audio = {
   t0: 0,
 };
 
+// ---------- i18n
+const I18N = {
+  en: {
+    music: (on) => `Music: ${on ? 'ON' : 'OFF'}`,
+    levelUpTitle: 'Level Up! Choose 1',
+    chestTitle: 'Treasure! Choose 1',
+
+    subtitle: 'Survive the horde. Grow your legend.',
+    hintMove: 'Move: WASD / Arrow Keys (mobile: joystick)',
+    hintAim: 'Aim: auto / forward',
+    hintPause: 'Pause: P',
+    startSub: 'Hold the line in the darkness. Upgrade your weapons and abilities.',
+    liMove: '<strong>WASD/Arrows</strong> Move',
+    liWand: '<strong>Wand</strong> Auto-target nearest enemy',
+    liBow: '<strong>Bow</strong> Fire forward (faces your direction; unlock via level-up)',
+    liPause: '<strong>P</strong> Pause',
+    startBtn: 'Start Adventure',
+    startHint: 'Hotkeys: Enter / Space',
+    pauseBtn: 'Pause',
+  },
+  zh: {
+    music: (on) => `音樂：${on ? '開' : '關'}`,
+    levelUpTitle: '升級！選 1 個',
+    chestTitle: '寶箱！選 1 個',
+
+    subtitle: '在黑暗中撐住，成長你的傳奇。',
+    hintMove: '移動：WASD / 方向鍵（手機：搖桿）',
+    hintAim: '瞄準：自動 / 朝前',
+    hintPause: '暫停：P',
+    startSub: '在黑暗中撐住，升級你的武器與能力。',
+    liMove: '<strong>WASD/方向鍵</strong> 移動',
+    liWand: '<strong>Wand</strong> 自動瞄準最近敵人',
+    liBow: '<strong>Bow</strong> 朝前方射（依角色面向；升級解鎖）',
+    liPause: '<strong>P</strong> 暫停',
+    startBtn: '開始冒險',
+    startHint: '快捷鍵：Enter / Space',
+    pauseBtn: '暫停',
+  },
+};
+
+let lang = (localStorage.getItem('df_lang') || 'zh');
+if (!I18N[lang]) lang = 'zh';
+
+function t(key, ...args) {
+  const v = I18N[lang][key];
+  return typeof v === 'function' ? v(...args) : v;
+}
+
+function applyStaticI18n() {
+  const set = (id, html) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = html;
+  };
+  const setText = (id, text) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+  };
+
+  setText('subtitle', t('subtitle'));
+  setText('hintMove', t('hintMove'));
+  setText('hintAim', t('hintAim'));
+  setText('hintPause', t('hintPause'));
+  setText('startSub', t('startSub'));
+  set('liMove', t('liMove'));
+  set('liWand', t('liWand'));
+  set('liBow', t('liBow'));
+  set('liPause', t('liPause'));
+  setText('startBtn', t('startBtn'));
+  setText('startHint', t('startHint'));
+  if (ui.pauseBtn) ui.pauseBtn.textContent = t('pauseBtn');
+}
+
+function setLang(next) {
+  lang = next;
+  localStorage.setItem('df_lang', lang);
+  if (ui.langBtn) ui.langBtn.textContent = (lang === 'zh') ? 'EN' : '中文';
+
+  // update modal title if open
+  if (ui.modalTitle) {
+    if (state.mode === 'levelup') ui.modalTitle.textContent = t('levelUpTitle');
+    if (state.mode === 'chest') ui.modalTitle.textContent = t('chestTitle');
+  }
+
+  applyStaticI18n();
+  setMusicLabel();
+}
+
 function setMusicLabel() {
   if (!ui.musicBtn) return;
-  ui.musicBtn.textContent = `Music: ${audio.musicOn ? 'ON' : 'OFF'}`;
+  ui.musicBtn.textContent = t('music', audio.musicOn);
 }
 
 function ensureAudio() {
@@ -840,7 +930,13 @@ ui.pauseBtn?.addEventListener('click', () => {
 ui.musicBtn?.addEventListener('click', () => {
   toggleMusic();
 });
-setMusicLabel();
+ui.langBtn?.addEventListener('click', () => {
+  setLang(lang === 'zh' ? 'en' : 'zh');
+});
+
+// init language
+setLang(lang);
+
 
 // ---------- game state
 const state = {
@@ -1553,20 +1649,20 @@ function checkLevelUp() {
 const CHEST_POOL = [
   {
     id: 'chest_heal',
-    title: '神聖藥水：回復 30 HP',
-    desc: '立刻回復生命（不超過上限）。',
+    title: { zh: '神聖藥水：回復 30 HP', en: 'Holy Potion: Heal 30 HP' },
+    desc: { zh: '立刻回復生命（不超過上限）。', en: 'Instantly heal (up to max HP).' },
     apply() { player.hp = Math.min(player.hpMax, player.hp + 30); }
   },
   {
     id: 'chest_xp',
-    title: '靈魂洪流：獲得大量經驗',
-    desc: '立即獲得 +40 XP（可能直接再升級）。',
+    title: { zh: '靈魂洪流：獲得大量經驗', en: 'Soul Surge: Gain Lots of XP' },
+    desc: { zh: '立即獲得 +40 XP（可能直接再升級）。', en: 'Gain +40 XP immediately (may trigger another level-up).' },
     apply() { player.xp += 40; checkLevelUp(); }
   },
   {
     id: 'chest_allcdr',
-    title: '符文：全武器冷卻 -8%',
-    desc: '所有武器出手更頻繁。',
+    title: { zh: '符文：全武器冷卻 -8%', en: 'Rune: All Weapon Cooldowns -8%' },
+    desc: { zh: '所有武器出手更頻繁。', en: 'All weapons fire more often.' },
     apply() {
       weapons.wand.baseCooldown *= 0.92;
       weapons.bow.baseCooldown *= 0.92;
@@ -1577,20 +1673,20 @@ const CHEST_POOL = [
   },
   {
     id: 'chest_blade_orbit',
-    title: '秘儀：迴旋斬半徑 +18',
-    desc: '刀刃轉得更外圈，命中更安全。',
+    title: { zh: '秘儀：迴旋斬半徑 +18', en: 'Arcana: Blade Orbit Radius +18' },
+    desc: { zh: '刀刃轉得更外圈，命中更安全。', en: 'Blades orbit wider for safer hits.' },
     apply() { weapons.blades.radius += 18; }
   },
   {
     id: 'chest_frost_big',
-    title: '冰霜王印：衝擊波範圍 +35',
-    desc: '控場覆蓋更大。',
+    title: { zh: '冰霜王印：衝擊波範圍 +35', en: 'Frost Sigil: Shockwave Radius +35' },
+    desc: { zh: '控場覆蓋更大。', en: 'Bigger crowd-control area.' },
     apply() { weapons.frost.maxRadius += 35; }
   },
   {
     id: 'chest_meteor_big',
-    title: '隕火核心：爆炸半徑 +28',
-    desc: '隕石更大更狠。',
+    title: { zh: '隕火核心：爆炸半徑 +28', en: 'Meteor Core: Explosion Radius +28' },
+    desc: { zh: '隕石更大更狠。', en: 'Bigger, meaner meteors.' },
     apply() { weapons.meteor.impactRadius += 28; weapons.meteor.burnRadius += 18; }
   },
 ];
@@ -1619,8 +1715,8 @@ const UPGRADE_POOL = [
   // Bow
   {
     id: 'unlock_bow',
-    title: '解鎖 Dragon Bow（滑鼠瞄準）',
-    desc: '獲得第二把武器：朝滑鼠方向射出龍焰箭。',
+    title: '解鎖 Dragon Bow',
+    desc: '獲得第二把武器：朝前方射出龍焰箭。',
     apply() { weapons.bow.enabled = true; }
   },
   {
@@ -1766,11 +1862,11 @@ const UPGRADE_POOL = [
 let currentChoices = [];
 
 function openLevelUp() {
-  openChoiceModal('levelup', '升級！選 1 個', UPGRADE_POOL);
+  openChoiceModal('levelup', t('levelUpTitle'), UPGRADE_POOL);
 }
 
 function openChest() {
-  openChoiceModal('chest', '寶箱！選 1 個', CHEST_POOL);
+  openChoiceModal('chest', t('chestTitle'), CHEST_POOL);
 }
 
 function openChoiceModal(mode, title, poolBase) {
@@ -1815,7 +1911,9 @@ function openChoiceModal(mode, title, poolBase) {
   currentChoices.forEach((u, idx) => {
     const div = document.createElement('div');
     div.className = 'choice';
-    div.innerHTML = `<div class="t">${idx + 1}. ${u.title}</div><div class="d">${u.desc}</div>`;
+    const title = (typeof u.title === 'object') ? (u.title[lang] || u.title.en || u.title.zh) : u.title;
+    const desc = (typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc;
+    div.innerHTML = `<div class="t">${idx + 1}. ${title}</div><div class="d">${desc}</div>`;
     div.addEventListener('click', () => chooseUpgrade(idx));
     ui.choices.appendChild(div);
   });

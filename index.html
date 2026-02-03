@@ -10,7 +10,7 @@
   <div id="ui">
     <div class="titleRow">
       <div class="title">Dragon Fantasy</div>
-      <div class="subtitle">Survive the horde. Grow your legend.</div>
+      <div class="subtitle" id="subtitle">Survive the horde. Grow your legend.</div>
     </div>
 
     <div class="row">
@@ -19,11 +19,12 @@
       <div><strong>Kills</strong>: <span id="kills">0</span></div>
       <div><strong>Time</strong>: <span id="time">0:00</span></div>
       <button id="musicBtn" class="miniBtn" type="button" title="Toggle music">Music: OFF</button>
+      <button id="langBtn" class="miniBtn" type="button" title="Language">中文</button>
     </div>
     <div class="row small">
-      <div>Move: WASD / Arrow Keys</div>
-      <div>Aim: auto / forward</div>
-      <div>Pause: P</div>
+      <div id="hintMove">Move: WASD / Arrow Keys</div>
+      <div id="hintAim">Aim: auto / forward</div>
+      <div id="hintPause">Pause: P</div>
     </div>
   </div>
 
@@ -32,15 +33,15 @@
   <div id="start" role="dialog" aria-modal="true" aria-label="Start game">
     <div class="card">
       <h1 class="hero">Dragon Fantasy</h1>
-      <div class="heroSub">在黑暗中撐住，升級你的武器與能力。</div>
+      <div class="heroSub" id="startSub">在黑暗中撐住，升級你的武器與能力。</div>
       <ul class="bullets">
-        <li><strong>WASD/方向鍵</strong> 移動</li>
-        <li><strong>Wand</strong> 自動瞄準最近敵人</li>
-        <li><strong>Bow</strong> 朝前方射（依角色面向；升級解鎖）</li>
-        <li><strong>P</strong> 暫停</li>
+        <li id="liMove"><strong>WASD/方向鍵</strong> 移動</li>
+        <li id="liWand"><strong>Wand</strong> 自動瞄準最近敵人</li>
+        <li id="liBow"><strong>Bow</strong> 朝前方射（依角色面向；升級解鎖）</li>
+        <li id="liPause"><strong>P</strong> 暫停</li>
       </ul>
       <button id="startBtn" class="btn">Start Adventure</button>
-      <div class="hint">快捷鍵：Enter / Space</div>
+      <div class="hint" id="startHint">快捷鍵：Enter / Space</div>
     </div>
   </div>
 
