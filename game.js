@@ -26,7 +26,7 @@ function resizeCanvas() {
   const vv = window.visualViewport;
   const cssW = Math.max(320, Math.floor((vv?.width || window.innerWidth || 960)));
   const cssH = Math.max(240, Math.floor((vv?.height || window.innerHeight || 540)));
-  const dpr = clamp(window.devicePixelRatio || 1, 1, 3);
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
 
   view.w = cssW;
   view.h = cssH;
