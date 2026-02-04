@@ -2397,7 +2397,14 @@ function checkLevelUp() {
     return;
   }
 
-  // otherwise open the normal modal
+  // otherwise open the normal modal.
+  // If many level-ups are queued, auto-pick all but one so the player doesn't have to tap 10+ times.
+  if (state.pendingLevelUps > 1) {
+    const nAuto = Math.min(12, state.pendingLevelUps - 1);
+    for (let i = 0; i < nAuto; i++) autoPickUpgrade();
+    state.pendingLevelUps = Math.max(0, state.pendingLevelUps - nAuto);
+  }
+
   state.pendingLevelUps = Math.max(0, state.pendingLevelUps - 1);
   state.lastLevelUpAt = state.elapsed;
   openLevelUp();
