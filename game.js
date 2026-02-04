@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v14';
+const BUILD = 'v65';
 
 // Debug log (on-screen)
 const debugLog = [];
