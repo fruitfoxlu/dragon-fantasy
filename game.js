@@ -1672,10 +1672,10 @@ function updateChainLightning(dt) {
   const w = weapons.lightning;
   if (!w.enabled) return;
 
-  // Highest level: effectively no cooldown
+  // Highest level: no cooldown
   const minCd = 0.05;
   const isMax = (w.shots >= 5 && w.chains >= 50);
-  const cdTarget = isMax ? minCd : Math.max(minCd, w.baseCooldown);
+  const cdTarget = isMax ? 0 : Math.max(minCd, w.baseCooldown);
 
   w.cd -= dt;
   if (w.cd > 0) return;
