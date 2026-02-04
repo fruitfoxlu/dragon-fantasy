@@ -2166,9 +2166,9 @@ function checkLevelUp() {
     player.level += 1;
     // XP needed: fast early, then ramps harder.
     if (player.level < 5) {
-      player.xpNeed = Math.floor(8 + player.level * 6);
+      player.xpNeed = Math.floor((8 + player.level * 6) * 3);
     } else {
-      player.xpNeed = Math.floor((10 + player.level * 7 + Math.pow(player.level, 1.25)) * 1.25);
+      player.xpNeed = Math.floor(((10 + player.level * 7 + Math.pow(player.level, 1.25)) * 1.25) * 3);
     }
     openLevelUp();
   }
@@ -3290,7 +3290,7 @@ function resetRun() {
   player.invuln = 0;
   player.level = 1;
   player.xp = 0;
-  player.xpNeed = 10;
+  player.xpNeed = 30;
   player.magnet = 70;
   player.weaponSlots = 4;
   player.weaponSlotsMax = 6;
