@@ -1856,45 +1856,32 @@ function updateChainLightning(dt) {
 
   w.cd -= dt;
   if (w.cd > 0) return;
+  if (!enemies.length) return;
 
-  const usedFirst = new Set();
+  // PERF: at high chain counts, use a fast "nearest list" approach instead of O(chains * enemies^2)
+  const shots = Math.max(1, w.shots || 1);
+  const chainsPer = Math.max(1, Math.min(w.chains || 1, 50));
+
+  // sort enemies once by distance to player
+  const sorted = enemies.slice();
+  sorted.sort((a, b) => (dist(player.x, player.y, a.x, a.y) - dist(player.x, player.y, b.x, b.y)));
+
   let any = false;
-
-  for (let s = 0; s < (w.shots || 1); s++) {
-    // pick a different first target each shot if possible
-    let first = null;
-    let bestD = Infinity;
-    for (const e of enemies) {
-      if (usedFirst.has(e)) continue;
-      const d = dist(player.x, player.y, e.x, e.y);
-      if (d < bestD) { bestD = d; first = e; }
-    }
-    if (!first) break;
-    usedFirst.add(first);
-
-    const chain = [first];
-    for (let k = 1; k < w.chains; k++) {
-      const last = chain[chain.length - 1];
-      let best = null;
-      let bestCd = Infinity;
-      for (const e of enemies) {
-        if (chain.includes(e)) continue;
-        const d = dist(last.x, last.y, e.x, e.y);
-        if (d <= w.range && d < bestCd) {
-          best = e;
-          bestCd = d;
-        }
-      }
-      if (!best) break;
-      chain.push(best);
-    }
+  for (let s = 0; s < shots; s++) {
+    const start = s * chainsPer;
+    if (start >= sorted.length) break;
+    const targets = sorted.slice(start, start + chainsPer);
+    if (!targets.length) break;
 
     const pts = [[player.x, player.y]];
-    for (const e of chain) pts.push([e.x, e.y]);
+    for (const e of targets) pts.push([e.x, e.y]);
 
+    // damage targets
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
-      if (!chain.includes(e)) continue;
+      // membership check: only damage if in this target chunk
+      // (targets are small, so this stays cheap)
+      if (!targets.includes(e)) continue;
       damageEnemy(e, w.damage, player.x, player.y);
       const [nx, ny] = norm(e.x - player.x, e.y - player.y);
       e.vx += nx * 60;
@@ -1902,7 +1889,8 @@ function updateChainLightning(dt) {
       if (e.hp <= 0) killEnemyAt(i);
     }
 
-    effects.push({ type: 'bolt', pts, t: 0, ttl: 0.16 });
+    // PERF: don't spam 5 bolt effects every frame at max power
+    if (!isMax || s === 0) effects.push({ type: 'bolt', pts, t: 0, ttl: 0.14 });
     any = true;
   }
 
@@ -3913,7 +3901,7 @@ function loop(now) {
 
     // Formation spawns (fixed schedule)
     // IMPORTANT: cap spawns to avoid runaway enemy counts (crash / freeze on mobile).
-    const MAX_ENEMIES = 260;
+    const MAX_ENEMIES = 200;
     if (state.elapsed >= state.nextShieldWallAt) {
       state.shieldWaves += 1;
       const waves = Math.min(4, state.shieldWaves);
