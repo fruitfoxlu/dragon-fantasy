@@ -2748,7 +2748,18 @@ const CHEST_POOL = [
   },
   {
     id: 'chest_doom',
-    title: { zh: '毀天碎片：+1（集滿 3 次施放）', en: 'Doom Shard: +1 (3 to cast)' },
+    title: {
+      zh: () => {
+        const rem = 3 - ((state.doomShards || 0) % 3);
+        const missing = (rem === 3) ? 0 : rem;
+        return `毀天碎片：+1（還缺 ${missing} 片）`;
+      },
+      en: () => {
+        const rem = 3 - ((state.doomShards || 0) % 3);
+        const missing = (rem === 3) ? 0 : rem;
+        return `Doom Shard: +1 (${missing} to go)`;
+      }
+    },
     desc: { zh: '收集 3 個碎片才能施放一次毀天滅地。', en: 'Collect 3 shards to cast Doom once.' },
     apply() { state.doomShards = (state.doomShards || 0) + 1; sfxPickup('reward'); }
   },
@@ -3111,8 +3122,14 @@ function openReplaceWeaponModal(newWeaponKey) {
   currentChoices.forEach((u, idx) => {
     const div = document.createElement('div');
     div.className = 'choice';
-    const title = (typeof u.title === 'object') ? (u.title[lang] || u.title.en || u.title.zh) : u.title;
-    const desc = (typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc;
+    const title = (typeof u.title === 'function')
+      ? u.title()
+      : ((typeof u.title === 'object')
+        ? ((typeof u.title[lang] === 'function') ? u.title[lang]() : (u.title[lang] || u.title.en || u.title.zh))
+        : u.title);
+    const desc = (typeof u.desc === 'function')
+      ? u.desc()
+      : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
     div.innerHTML = `<div class="t">${idx + 1}. ${title}</div><div class="d">${desc}</div>`;
     div.addEventListener('click', () => chooseUpgrade(idx));
     ui.choices.appendChild(div);
@@ -3226,8 +3243,14 @@ function openChoiceModal(mode, title, poolBase) {
   currentChoices.forEach((u, idx) => {
     const div = document.createElement('div');
     div.className = 'choice';
-    const title = (typeof u.title === 'object') ? (u.title[lang] || u.title.en || u.title.zh) : u.title;
-    const desc = (typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc;
+    const title = (typeof u.title === 'function')
+      ? u.title()
+      : ((typeof u.title === 'object')
+        ? ((typeof u.title[lang] === 'function') ? u.title[lang]() : (u.title[lang] || u.title.en || u.title.zh))
+        : u.title);
+    const desc = (typeof u.desc === 'function')
+      ? u.desc()
+      : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
     div.innerHTML = `<div class="t">${idx + 1}. ${title}</div><div class="d">${desc}</div>`;
     div.addEventListener('click', () => chooseUpgrade(idx));
     ui.choices.appendChild(div);
