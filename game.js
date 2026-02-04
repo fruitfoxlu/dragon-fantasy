@@ -1300,6 +1300,7 @@ function spawnEnemy() {
 
 function spawnBoss() {
   // Big Boss: tougher, unique attacks, better loot.
+  // Two variants: normal (gold) and purple (harder, double treasure).
   const margin = 120;
   const w = view.w, h = view.h;
   const side = (Math.random() * 4) | 0;
@@ -1311,11 +1312,14 @@ function spawnBoss() {
   if (side === 2) { sx = px + rand(-w / 2, w / 2); sy = py + h / 2 + margin; }
   if (side === 3) { sx = px - w / 2 - margin; sy = py + rand(-h / 2, h / 2); }
 
+  const purple = Math.random() < 0.35;
+  const bossHpBase = (1200 + state.elapsed * 3.2) * 5;
+
   const boss = {
     x: sx,
     y: sy,
     r: 44,
-    hp: (1200 + state.elapsed * 3.2) * 5,
+    hp: bossHpBase * (purple ? 2 : 1),
     speed: 95,
     touchDmg: 28,
     vx: 0,
@@ -1327,6 +1331,7 @@ function spawnBoss() {
 
     type: 'boss',
     elite: true,
+    purpleBoss: purple,
     dir: 0,
     anim: 0,
 
@@ -1384,7 +1389,8 @@ function killEnemyAt(index) {
   if (e.type === 'boss') {
     // Big Boss always drops big rewards.
     sfxPickup('reward');
-    for (let k = 0; k < 3; k++) {
+    const chestMul = e.purpleBoss ? 2 : 1;
+    for (let k = 0; k < 3 * chestMul; k++) {
       chests.push({ x: e.x + rand(-22, 22), y: e.y + rand(-22, 22), r: 12 });
     }
     for (let k = 0; k < 10; k++) {
@@ -2836,7 +2842,7 @@ function draw() {
       ctx.globalAlpha = 0.95;
       ctx.translate(sx, sy);
       // helmet (pixel blocks)
-      ctx.fillStyle = 'rgba(246,195,92,.95)';
+      ctx.fillStyle = e.purpleBoss ? 'rgba(180,90,255,.95)' : 'rgba(246,195,92,.95)';
       ctx.fillRect(-14 * scale/5, -34 * scale/5, 28 * scale/5, 10 * scale/5);
       ctx.fillRect(-18 * scale/5, -30 * scale/5, 7 * scale/5, 7 * scale/5);
       ctx.fillRect(11 * scale/5, -30 * scale/5, 7 * scale/5, 7 * scale/5);
