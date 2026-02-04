@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v104';
+const BUILD = 'v105';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -3388,7 +3388,7 @@ function openChest() {
   if (ui.modalTitle) ui.modalTitle.textContent = t('chestTitle');
 
   const MAGIC_CAP = 10;
-  // No level gates for spells: any spell can appear from chests at any time.
+  // Keep some surprise: Lightning + Dragon only appear from Lv15+
 
   const magicEnabled = (k) => weapons[k].enabled;
   const magicLvl = (k) => (weapons[k].lvl || 0);
@@ -3406,6 +3406,9 @@ function openChest() {
     );
     if (!isMagic) return false;
 
+    // gate surprises
+    if ((id === 'unlock_lightning' || id.startsWith('lightning_')) && player.level < 15) return false;
+    if ((id === 'unlock_dragon' || id.startsWith('dragon_')) && player.level < 15) return false;
 
     // unlock only if not enabled
     if (id === 'unlock_meteor') return !weapons.meteor.enabled;
@@ -3431,11 +3434,18 @@ function openChest() {
   const xpOpt = (mult, idx) => ({
     id: `chest_xp_${idx}`,
     title: { zh: `靈魂洪流：+${Math.floor(mult * 100)}% 經驗`, en: `Soul Surge: +${Math.floor(mult * 100)}% XP` },
-    desc: { zh: '魔法都滿級了，改拿經驗。', en: 'All spells maxed; take XP instead.' },
+    desc: { zh: '化作靈魂洪流，快速提升等級。', en: 'A surge of souls to level faster.' },
     apply() {
       player.xp += Math.floor(player.xpNeed * mult);
       checkLevelUp();
     }
+  });
+
+  const healOpt = () => ({
+    id: 'chest_heal',
+    title: { zh: '神聖藥水：回復 30 HP', en: 'Holy Potion: Heal 30 HP' },
+    desc: { zh: '立刻回復生命（不超過上限）。', en: 'Instantly heal (up to max HP).' },
+    apply() { player.hp = Math.min(player.hpMax, player.hp + 30); }
   });
 
   // XP (Soul Surge) should NOT appear early.
@@ -3455,6 +3465,15 @@ function openChest() {
       if (used.has(u.id)) continue;
       used.add(u.id);
       currentChoices.push(u);
+    }
+
+    // optional: chest can also offer a heal
+    if (player.hp < player.hpMax && currentChoices.length < 3) {
+      const h = healOpt();
+      if (!used.has(h.id)) {
+        used.add(h.id);
+        currentChoices.push(h);
+      }
     }
 
     // fill remaining: NEVER duplicate the same spell option.
