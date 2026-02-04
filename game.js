@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v90';
+const BUILD = 'v91';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -722,11 +722,26 @@ const SPR = {
   }),
 
   chest: makeSprite(16, 16, (g) => {
-    px(g, 2, 6, 12, 8, '#7a4b22');
-    px(g, 2, 4, 12, 3, '#9b6a30');
-    px(g, 2, 8, 12, 1, '#5d3517');
-    px(g, 7, 7, 2, 2, '#f6c35c');
-    outline(g, 2, 4, 12, 10, 'rgba(0,0,0,.35)');
+    // "Treasure Gem" (bright, eye-catching)
+    px(g, 6, 1, 4, 2, '#fff6dc');
+    px(g, 5, 3, 6, 2, '#c9fbff');
+
+    // body
+    px(g, 6, 4, 4, 1, '#b7ffda');
+    px(g, 4, 5, 8, 2, '#31e7ff');
+    px(g, 3, 7, 10, 2, '#0bbbd8');
+    px(g, 4, 9, 8, 2, '#078aa5');
+    px(g, 6, 11, 4, 2, '#05657b');
+
+    // facets (purple edge)
+    px(g, 2, 7, 1, 2, 'rgba(175,90,255,.80)');
+    px(g, 13, 7, 1, 2, 'rgba(175,90,255,.80)');
+
+    // sparkle
+    px(g, 3, 4, 1, 1, '#ffffff');
+    px(g, 12, 6, 1, 1, '#ffffff');
+
+    outline(g, 3, 4, 10, 10, 'rgba(0,0,0,.32)');
   }),
 
   blade: makeSprite(14, 14, (g) => {
@@ -1262,8 +1277,8 @@ const gems = [];          // {x,y,r, xp}
 const chests = [];        // {x,y,r}
 
 function pushChest(x, y, r=12) {
-  // hard cap: max 4 chests on the map
-  if (chests.length >= 4) return false;
+  // hard cap: max 10 treasure gems on the map
+  if (chests.length >= 10) return false;
   chests.push({ x, y, r });
   return true;
 }
@@ -1720,7 +1735,7 @@ function killEnemyAt(index) {
       heals.push({ x: e.x, y: e.y, r: 12, amount: 25 });
     }
 
-    // Normal mobs: very low chance to drop a chest (magic-only chests; map capped to 4).
+    // Normal mobs: very low chance to drop a treasure gem (magic-only chest; map capped to 10).
     // Keep it low to preserve elite/boss value.
     const chestChance = 0.002; // 0.2%
     if (state.elapsed >= 60 && Math.random() < chestChance) {
