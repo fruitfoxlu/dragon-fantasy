@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v115';
+const BUILD = 'v116';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1298,8 +1298,8 @@ const gems = [];          // {x,y,r, xp}
 const chests = [];        // {x,y,r}
 
 function pushChest(x, y, r=12) {
-  // hard cap: max 10 treasure gems on the map
-  if (chests.length >= 10) return false;
+  // hard cap: max 6 treasure gems on the map; overflow becomes heal drop
+  if (chests.length >= 6) return false;
   chests.push({ x, y, r });
   return true;
 }
@@ -1494,10 +1494,11 @@ function spawnEnemy() {
 
   const tier = Math.min(6, 1 + (state.elapsed / 55) | 0);
 
-  // enemy mix
-  const rangerChance = clamp(0.12 + state.elapsed / 260 * 0.05, 0.12, 0.22);
-  const eliteChance = (state.elapsed < 180) ? 0 : clamp(0.02 + (state.elapsed - 180) / 420 * 0.03, 0.02, 0.08);
-  const ninjaChance = (state.elapsed < 120) ? 0 : clamp(0.025 + (state.elapsed - 120) / 240 * 0.05, 0.025, 0.10);
+  // enemy mix (LEVEL-based)
+  const L = player.level || 1;
+  const rangerChance = clamp(0.12 + Math.max(0, L - 1) * 0.004, 0.12, 0.22);
+  const eliteChance = (L < 15) ? 0 : clamp(0.02 + (L - 15) * 0.003, 0.02, 0.10);
+  const ninjaChance = (L < 10) ? 0 : clamp(0.03 + (L - 10) * 0.004, 0.03, 0.12);
 
   let type = 'melee';
   const rollType = Math.random();
@@ -1505,8 +1506,8 @@ function spawnEnemy() {
   else if (rollType < ninjaChance + rangerChance) type = 'ranger';
   else type = 'melee';
   const elite = Math.random() < eliteChance;
-  const bigChance = (state.elapsed < 60) ? 0 : clamp(0.05 + (state.elapsed - 60) / 240 * 0.09, 0.05, 0.14);
-  const big = (!elite && Math.random() < bigChance); // second mob variant: big brute
+  const bigChance = (L < 5) ? 0 : clamp(0.05 + (L - 5) * 0.004, 0.05, 0.16);
+  const big = (!elite && Math.random() < bigChance); // big brute
 
   let r = 11 + tier * 1.5;
   let hp = 24 + tier * 10 + rand(0, 10);
@@ -1832,7 +1833,9 @@ function killEnemyAt(index) {
     sfxPickup('reward');
     const chestMul = e.purpleBoss ? 2 : 1;
     for (let k = 0; k < 3 * chestMul; k++) {
-      pushChest(e.x + rand(-22, 22), e.y + rand(-22, 22), 12);
+      if (!pushChest(e.x + rand(-22, 22), e.y + rand(-22, 22), 12)) {
+        heals.push({ x: e.x + rand(-18, 18), y: e.y + rand(-18, 18), r: 12, amount: 25 });
+      }
     }
     for (let k = 0; k < 10; k++) {
       gems.push({ x: e.x + rand(-28, 28), y: e.y + rand(-28, 28), r: 6, xp: baseXp * 2 });
@@ -1842,8 +1845,14 @@ function killEnemyAt(index) {
   } else if (e.elite) {
     // Elite: guaranteed treasure gem + extra chance.
     sfxPickup('reward');
-    pushChest(e.x, e.y, 12);
-    if (Math.random() < 0.35) pushChest(e.x + rand(-14, 14), e.y + rand(-14, 14), 12);
+    if (!pushChest(e.x, e.y, 12)) {
+      heals.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12, amount: 25 });
+    }
+    if (Math.random() < 0.35) {
+      if (!pushChest(e.x + rand(-14, 14), e.y + rand(-14, 14), 12)) {
+        heals.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12, amount: 25 });
+      }
+    }
 
     // Elite bonus: small chance of vacuum or potion
     const roll = Math.random();
@@ -1865,7 +1874,9 @@ function killEnemyAt(index) {
     if (state.elapsed >= 60 && Math.random() < chestChance) {
       // slight SFX cue so players notice it dropped
       sfxPickup('reward');
-      pushChest(e.x + rand(-10, 10), e.y + rand(-10, 10), 12);
+      if (!pushChest(e.x + rand(-10, 10), e.y + rand(-10, 10), 12)) {
+        heals.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12, amount: 25 });
+      }
     }
   }
 
@@ -4581,42 +4592,40 @@ function loop(now) {
         if (Math.random() < 0.30) spawnEnemy();
       }
 
-      // Boss spawn (fixed time gate)
-      const bossAlive = enemies.some(e => e.type === 'boss');
-      if (state.elapsed >= 360 && !bossAlive && state.elapsed >= state.nextBossAt) {
+      // Boss spawn (LEVEL gate)
+      const bossAlive = enemies.some(e => e.type === 'boss' && !e.finalBoss);
+      if (!bossAlive && player.level >= 25 && state.elapsed >= state.nextBossAt) {
         spawnBoss();
-        state.nextBossAt += 300;
+        state.nextBossAt = state.elapsed + 55; // cooldown
       }
 
-      // Formation spawns (unlocked by time; probabilistic; squads only)
+      // Formation spawns (LEVEL gate; squads only)
       // IMPORTANT: cap spawns to avoid runaway enemy counts (crash / freeze on mobile).
-      const MAX_ENEMIES = 200;
+      const MAX_ENEMIES = 260;
 
-      // Shield wall unlock at 3:00
-      if (state.elapsed >= 180 && state.elapsed >= state.nextShieldWallAt) {
+      // Shield wall unlock at Lv15
+      if (player.level >= 15 && state.elapsed >= state.nextShieldWallAt) {
         const room = Math.max(0, MAX_ENEMIES - enemies.length);
         const canForm = Math.floor(room / 20);
-        const mins = (state.elapsed - 180) / 60;
-        const p = clamp(0.12 + mins * 0.06, 0.12, 0.42); // slowly rises
+        const p = clamp(0.10 + (player.level - 15) * 0.01, 0.10, 0.40);
         if (canForm > 0 && Math.random() < p) {
           spawnShieldWall(((Math.random() * 4) | 0));
           state.shieldWaves += 1;
-          state.nextShieldWallAt = state.elapsed + 60; // at most ~1/min
+          state.nextShieldWallAt = state.elapsed + 50; // cooldown
         } else {
-          state.nextShieldWallAt = state.elapsed + 10; // retry soon
+          state.nextShieldWallAt = state.elapsed + 10;
         }
       }
 
-      // Cavalry unlock at 4:00
-      if (state.elapsed >= 240 && state.elapsed >= state.nextCavAt) {
+      // Cavalry unlock at Lv20
+      if (player.level >= 20 && state.elapsed >= state.nextCavAt) {
         const room = Math.max(0, MAX_ENEMIES - enemies.length);
         const canForm = Math.floor(room / 15);
-        const mins = (state.elapsed - 240) / 60;
-        const p = clamp(0.10 + mins * 0.05, 0.10, 0.35);
+        const p = clamp(0.08 + (player.level - 20) * 0.008, 0.08, 0.30);
         if (canForm > 0 && Math.random() < p) {
           spawnCavalryV(((Math.random() * 4) | 0));
           state.cavWaves += 1;
-          state.nextCavAt = state.elapsed + 60; // at most ~1/min
+          state.nextCavAt = state.elapsed + 55; // cooldown
         } else {
           state.nextCavAt = state.elapsed + 10;
         }
