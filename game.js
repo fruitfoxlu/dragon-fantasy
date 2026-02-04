@@ -928,10 +928,9 @@ function resetJoy() {
 }
 
 ui.joy?.addEventListener('pointerdown', (e) => {
-  e.preventDefault?.();
   joy.active = true;
   joy.id = e.pointerId;
-  try { ui.joy.setPointerCapture(e.pointerId); } catch {}
+  ui.joy.setPointerCapture(e.pointerId);
   const r = ui.joy.getBoundingClientRect();
   joy.cx = r.left + r.width / 2;
   joy.cy = r.top + r.height / 2;
@@ -941,7 +940,6 @@ ui.joy?.addEventListener('pointerdown', (e) => {
 });
 ui.joy?.addEventListener('pointermove', (e) => {
   if (!joy.active || e.pointerId !== joy.id) return;
-  e.preventDefault?.();
   joy.x = e.clientX;
   joy.y = e.clientY;
   setJoy((joy.x - joy.cx) / 44, (joy.y - joy.cy) / 44);
@@ -951,41 +949,6 @@ ui.joy?.addEventListener('pointerup', (e) => {
   resetJoy();
 });
 ui.joy?.addEventListener('pointercancel', resetJoy);
-
-// iOS/Safari fallback: touch events (some in-app browsers are flaky with PointerEvents)
-const touchPoint = (ev) => (ev.touches && ev.touches[0]) || (ev.changedTouches && ev.changedTouches[0]);
-ui.joy?.addEventListener('touchstart', (ev) => {
-  const t = touchPoint(ev);
-  if (!t) return;
-  ev.preventDefault();
-  joy.active = true;
-  joy.id = 'touch';
-  const r = ui.joy.getBoundingClientRect();
-  joy.cx = r.left + r.width / 2;
-  joy.cy = r.top + r.height / 2;
-  joy.x = t.clientX;
-  joy.y = t.clientY;
-  setJoy((joy.x - joy.cx) / 44, (joy.y - joy.cy) / 44);
-}, { passive: false });
-ui.joy?.addEventListener('touchmove', (ev) => {
-  if (!joy.active || joy.id !== 'touch') return;
-  const t = touchPoint(ev);
-  if (!t) return;
-  ev.preventDefault();
-  joy.x = t.clientX;
-  joy.y = t.clientY;
-  setJoy((joy.x - joy.cx) / 44, (joy.y - joy.cy) / 44);
-}, { passive: false });
-ui.joy?.addEventListener('touchend', (ev) => {
-  if (joy.id !== 'touch') return;
-  ev.preventDefault();
-  resetJoy();
-}, { passive: false });
-ui.joy?.addEventListener('touchcancel', (ev) => {
-  if (joy.id !== 'touch') return;
-  ev.preventDefault();
-  resetJoy();
-}, { passive: false });
 
 ui.pauseBtn?.addEventListener('click', () => {
   paused = !paused;
