@@ -67,6 +67,7 @@ const I18N = {
     skip: 'Skip',
     slotUp: (n) => `Weapon Slot +1 (now ${n})`,
     vacuum: 'Vacuum Gem: Loot pulled to you!',
+  healPick: (n) => `Healed +${n} HP`,
 
     subtitle: 'Survive the horde. Grow your legend.',
     hintMove: 'Move: WASD / Arrow Keys (mobile: joystick)',
@@ -96,6 +97,7 @@ const I18N = {
     skip: '略過',
     slotUp: (n) => `武器槽 +1（目前 ${n}）`,
     vacuum: '真空寶石：全地圖掉落吸到你身上！',
+    healPick: (n) => `回復 +${n} HP`,
 
     subtitle: '在黑暗中撐住，成長你的傳奇。',
     hintMove: '移動：WASD / 方向鍵（手機：搖桿）',
@@ -684,6 +686,15 @@ const SPR = {
     outline(g, 5, 3, 6, 9, 'rgba(0,0,0,.28)');
   }),
 
+  heal: makeSprite(16, 16, (g) => {
+    // red potion
+    px(g, 6, 2, 4, 3, '#cbd6e8');
+    px(g, 5, 5, 6, 9, '#b8303a');
+    px(g, 6, 6, 4, 6, '#e45b63');
+    px(g, 6, 8, 2, 2, '#fff6dc');
+    outline(g, 5, 5, 6, 9, 'rgba(0,0,0,.35)');
+  }),
+
   boneShot: makeSprite(10, 6, (g) => {
     px(g, 1, 2, 8, 2, '#e9e6dd');
     px(g, 0, 1, 2, 1, '#d6d1c4');
@@ -1089,6 +1100,7 @@ const gems = [];          // {x,y,r, xp}
 const chests = [];        // {x,y,r}
 const slotOrbs = [];      // {x,y,r}
 const vacuumGems = [];    // {x,y,r}
+const heals = [];         // {x,y,r, amount}
 
 // Visual/area effects
 const effects = [];
@@ -1278,6 +1290,11 @@ function killEnemyAt(index) {
     // Elite: rare vacuum gem
     if (Math.random() < 0.10) {
       vacuumGems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12 });
+    }
+  } else {
+    // Normal mobs: small chance to drop a healing potion.
+    if (Math.random() < 0.06) {
+      heals.push({ x: e.x, y: e.y, r: 12, amount: 12 });
     }
   }
 
@@ -1756,6 +1773,7 @@ function vacuumAllLootToPlayer() {
   for (const g of gems) { g.x = player.x + rand(-8, 8); g.y = player.y + rand(-8, 8); }
   for (const c of chests) { c.x = player.x + rand(-18, 18); c.y = player.y + rand(-18, 18); }
   for (const s of slotOrbs) { s.x = player.x + rand(-12, 12); s.y = player.y + rand(-12, 12); }
+  for (const h of heals) { h.x = player.x + rand(-12, 12); h.y = player.y + rand(-12, 12); }
 }
 
 function updateVacuumGems(dt) {
@@ -1767,6 +1785,24 @@ function updateVacuumGems(dt) {
       vacuumAllLootToPlayer();
       toast.text = t('vacuum');
       toast.t = 2.0;
+      return;
+    }
+  }
+}
+
+function updateHeals(dt) {
+  for (let i = heals.length - 1; i >= 0; i--) {
+    const h = heals[i];
+    const d = dist(player.x, player.y, h.x, h.y);
+    if (d < player.r + h.r) {
+      heals.splice(i, 1);
+      const before = player.hp;
+      player.hp = Math.min(player.hpMax, player.hp + h.amount);
+      const gained = Math.max(0, (player.hp - before) | 0);
+      if (gained > 0) {
+        toast.text = t('healPick', gained);
+        toast.t = 1.6;
+      }
       return;
     }
   }
@@ -2332,6 +2368,12 @@ function draw() {
     drawSprite(SPR.vacuumGem, sx, sy, { scale: 1.2, alpha: 0.98 });
   }
 
+  // healing potions
+  for (const h of heals) {
+    const [sx, sy] = worldToScreen(h.x, h.y);
+    drawSprite(SPR.heal, sx, sy, { scale: 1.1, alpha: 0.98 });
+  }
+
   // weapon slot orbs
   for (const s of slotOrbs) {
     const [sx, sy] = worldToScreen(s.x, s.y);
@@ -2618,6 +2660,7 @@ function loop(now) {
     updateEffects(dt);
     updateEnemies(dt);
     updateVacuumGems(dt);
+    updateHeals(dt);
     updateSlots(dt);
     updateChests(dt);
     updateGems(dt);
@@ -2637,6 +2680,7 @@ function resetRun() {
   chests.length = 0;
   slotOrbs.length = 0;
   vacuumGems.length = 0;
+  heals.length = 0;
   effects.length = 0;
 
   toast.text = '';
