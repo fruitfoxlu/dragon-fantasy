@@ -1117,6 +1117,7 @@ const state = {
   // level-up pacing
   pendingLevelUps: 0,
   lastLevelUpAt: -999,
+  lastLevelBatch: null, // {from,to}
   choiceLock: false,
 };
 
@@ -2377,11 +2378,15 @@ function autoPickUpgrade() {
 function checkLevelUp() {
   // Convert XP into level steps and queue upgrades.
   // Important: apply level steps even if a modal is open, so level doesn't appear "stuck".
+  const startLevel = player.level;
   let guard = 0;
   while (player.xp >= player.xpNeed) {
     applyLevelStep();
     state.pendingLevelUps += 1;
     if (++guard > 200) break; // safety
+  }
+  if (player.level > startLevel) {
+    state.lastLevelBatch = { from: startLevel, to: player.level };
   }
 
   if (state.mode !== 'play') return;
@@ -2398,9 +2403,19 @@ function checkLevelUp() {
   }
 
   // otherwise open the normal modal.
-  // If many level-ups are queued, auto-pick all but one so the player doesn't have to tap 10+ times.
+  // If many level-ups are queued, auto-pick the bulk so the player doesn't have to tap 10–30 times.
+  if (state.pendingLevelUps >= 3) {
+    const nAuto = state.pendingLevelUps; // auto-pick all
+    for (let i = 0; i < nAuto; i++) autoPickUpgrade();
+    state.pendingLevelUps = 0;
+    state.lastLevelUpAt = state.elapsed;
+    // no modal in bulk case
+    return;
+  }
+
+  // small queue: keep one manual choice
   if (state.pendingLevelUps > 1) {
-    const nAuto = Math.min(12, state.pendingLevelUps - 1);
+    const nAuto = state.pendingLevelUps - 1;
     for (let i = 0; i < nAuto; i++) autoPickUpgrade();
     state.pendingLevelUps = Math.max(0, state.pendingLevelUps - nAuto);
   }
@@ -2766,8 +2781,16 @@ let currentChoices = [];
 let pendingWeaponUnlock = null;
 
 function openLevelUp() {
-  const extra = state.pendingLevelUps > 0 ? (lang === 'zh' ? `（連升剩 ${state.pendingLevelUps}）` : ` (+${state.pendingLevelUps} queued)`) : '';
-  openChoiceModal('levelup', t('levelUpTitle') + extra, UPGRADE_POOL);
+  let rangeTxt = '';
+  if (state.lastLevelBatch && state.lastLevelBatch.to > state.lastLevelBatch.from) {
+    rangeTxt = (lang === 'zh')
+      ? `（Lv ${state.lastLevelBatch.from} → ${state.lastLevelBatch.to}）`
+      : ` (Lv ${state.lastLevelBatch.from} → ${state.lastLevelBatch.to})`;
+  }
+  const extra = state.pendingLevelUps > 0
+    ? (lang === 'zh' ? `（連升剩 ${state.pendingLevelUps}）` : ` (+${state.pendingLevelUps} queued)`)
+    : '';
+  openChoiceModal('levelup', t('levelUpTitle') + rangeTxt + extra, UPGRADE_POOL);
 }
 
 function openChest() {
