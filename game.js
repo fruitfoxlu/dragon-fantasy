@@ -1973,7 +1973,7 @@ function applyMeteorImpact(x, y) {
     const e = enemies[i];
     const d = dist(x, y, e.x, e.y);
     if (d <= w.impactRadius + e.r) {
-      damageEnemy(e, w.impactDamage, fx.x, fx.y);
+      damageEnemy(e, w.impactDamage, x, y);
       // knockback outward
       const [nx, ny] = norm(e.x - x, e.y - y);
       e.vx += nx * 220;
