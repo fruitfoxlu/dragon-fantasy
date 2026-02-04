@@ -1145,7 +1145,17 @@ function spawnEnemy() {
   // - Lv10+: scales per level but capped to keep the "爽" feeling
   if (!elite) {
     if (player.level < 10) {
-      hp = Math.min(hp, weapons.wand.damage * 0.95);
+      // Early game: cap mob HP by the currently weakest weapon so everything feels "one-shot".
+      const candidates = [];
+      if (weapons.wand.enabled) candidates.push(weapons.wand.damage);
+      if (weapons.bow.enabled) candidates.push(weapons.bow.damage);
+      if (weapons.blades.enabled) candidates.push(weapons.blades.damage);
+      if (weapons.lightning.enabled) candidates.push(weapons.lightning.damage);
+      if (weapons.frost.enabled) candidates.push(weapons.frost.damage);
+      if (weapons.meteor.enabled) candidates.push(weapons.meteor.impactDamage);
+
+      const weakest = Math.max(1, Math.min(...(candidates.length ? candidates : [weapons.wand.damage])));
+      hp = Math.min(hp, weakest * 0.95);
     } else {
       const mul = Math.min(2.2, 1 + 0.12 * (player.level - 10));
       hp *= mul;
