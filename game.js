@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v112';
+const BUILD = 'v113';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1191,7 +1191,7 @@ const weapons = {
     enabled: false,
     cd: 0,
     baseCooldown: 0.266,
-    damage: 27,
+    damage: 18,
     projectiles: 5,
     spread: Math.PI / 12, // 15° per arrow (fan)
     fanMax: Math.PI,      // total fan angle cap (180°)
@@ -1952,10 +1952,8 @@ function updateProjectileWeapons(dt) {
     if (w.cd > 0) continue;
 
     if (w.kind === 'cardinal') {
-      // Holy Water: fire in 4 directions; at Lv8+ fire in 8 directions
-      const dirs4 = [[1,0],[-1,0],[0,1],[0,-1]];
-      const dirs8 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
-      const dirs = (w.lvl >= 8) ? dirs8 : dirs4;
+      // Holy Water: fire in 8 directions (from start)
+      const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
       for (const [dx, dy] of dirs) {
         fireBullet(player.x, player.y, dx, dy, w);
       }
@@ -4661,7 +4659,7 @@ function resetRun() {
   weapons.bow.enabled = false;
   weapons.bow.lvl = 0;
   weapons.bow.baseCooldown = 0.266;
-  weapons.bow.damage = 27;
+  weapons.bow.damage = 18;
   weapons.bow.projectiles = 5;
   weapons.bow.pierce = 1;
   weapons.bow.cd = 0;
