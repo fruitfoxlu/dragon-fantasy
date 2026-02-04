@@ -3928,16 +3928,26 @@ function loop(now) {
     }
 
     // Formation spawns (fixed schedule)
+    // IMPORTANT: cap spawns to avoid runaway enemy counts (crash / freeze on mobile).
+    const MAX_ENEMIES = 260;
     if (state.elapsed >= state.nextShieldWallAt) {
       state.shieldWaves += 1;
-      for (let k = 0; k < state.shieldWaves; k++) {
+      const waves = Math.min(4, state.shieldWaves);
+      const room = Math.max(0, MAX_ENEMIES - enemies.length);
+      const canForm = Math.floor(room / 20);
+      const spawnN = Math.min(waves, canForm);
+      for (let k = 0; k < spawnN; k++) {
         spawnShieldWall(((Math.random() * 4) | 0));
       }
       state.nextShieldWallAt += 90;
     }
     if (state.elapsed >= state.nextCavAt) {
       state.cavWaves += 1;
-      for (let k = 0; k < state.cavWaves; k++) {
+      const waves = Math.min(4, state.cavWaves);
+      const room = Math.max(0, MAX_ENEMIES - enemies.length);
+      const canForm = Math.floor(room / 15);
+      const spawnN = Math.min(waves, canForm);
+      for (let k = 0; k < spawnN; k++) {
         spawnCavalryV(((Math.random() * 4) | 0));
       }
       state.nextCavAt += 120;
