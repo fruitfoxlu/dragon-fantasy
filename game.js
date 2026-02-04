@@ -1426,7 +1426,7 @@ function updatePlayer(dt) {
 
   // keep player in sane world coords but allow a HUGE map (effectively endless)
   // (Bounds exist only to prevent NaN/overflow issues.)
-  const WBOUND = 120000;
+  const WBOUND = 10000000;
   player.x = clamp(player.x, -WBOUND, WBOUND);
   player.y = clamp(player.y, -WBOUND, WBOUND);
 
