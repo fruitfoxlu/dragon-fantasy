@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v107';
+const BUILD = 'v108';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1192,12 +1192,13 @@ const weapons = {
     cd: 0,
     baseCooldown: 0.8,
     damage: 18,
-    projectiles: 3,
-    spread: 0.14, // fan spread
+    projectiles: 5,
+    spread: Math.PI / 12, // 15° per arrow (fan)
+    fanMax: Math.PI,      // total fan angle cap (180°)
     speed: 620,
     pierce: 1,
     bulletR: 6,        // thicker arrow
-    ricochetMax: 8,    // cap
+    ricochetMax: 5,    // each arrow bounces up to 5 enemies
   },
 
   holy: {
@@ -1766,10 +1767,10 @@ function fireBullet(fromX, fromY, dirX, dirY, spec) {
   const [nx, ny] = norm(dirX, dirY);
   const r = spec.bulletR || 4;
 
-  // Bow ricochet unlocks with level (start at 1; then +1 per bow level, capped)
+  // Bow ricochet: always on; capped
   let ric = 0;
   if (spec.kind === 'forward') {
-    ric = Math.max(1, Math.min(spec.ricochetMax || 0, (spec.lvl || 1)));
+    ric = Math.max(1, Math.min(spec.ricochetMax || 0, spec.ricochetMax || 0));
   }
 
   bullets.push({
@@ -2022,8 +2023,14 @@ function updateProjectileWeapons(dt) {
           ty = wandTargets[i].y - player.y;
         }
         const baseAng = Math.atan2(ty, tx);
-        const spread = 0; // multi-target already spreads naturally
-        const jitter = rand(-w.spread, w.spread) * 0.18;
+        const isForwardFan = (w.kind === 'forward');
+        const step = isForwardFan
+          ? Math.min(w.spread || (Math.PI/12), (w.fanMax || Math.PI) / Math.max(1, (w.projectiles - 1)))
+          : 0;
+        const spread = isForwardFan
+          ? ((w.projectiles === 1) ? 0 : (i - (w.projectiles - 1) / 2) * step)
+          : 0;
+        const jitter = rand(-w.spread, w.spread) * (isForwardFan ? 0.10 : 0.18);
         const ang = baseAng + spread + jitter;
         fireBullet(player.x, player.y, Math.cos(ang), Math.sin(ang), w);
       }
@@ -4726,7 +4733,7 @@ function resetRun() {
   weapons.bow.lvl = 0;
   weapons.bow.baseCooldown = 0.8;
   weapons.bow.damage = 18;
-  weapons.bow.projectiles = 3;
+  weapons.bow.projectiles = 5;
   weapons.bow.pierce = 1;
   weapons.bow.cd = 0;
 
