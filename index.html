@@ -6,14 +6,14 @@
   <title>Dragon Fantasy</title>
   <meta name="author" content="Royce Lu (fruitfoxlu@gmail.com)" />
   <meta name="license" content="FreeBSD (BSD 2-Clause)" />
-  <link rel="stylesheet" href="style.css?v=97" />
+  <link rel="stylesheet" href="style.css?v=98" />
 </head>
 <body>
   <div id="ui">
     <div class="titleRow">
       <div class="title">Dragon Fantasy</div>
       <div class="subtitle" id="subtitle">Survive the horde. Grow your legend.</div>
-      <div class="build" id="build">v97</div>
+      <div class="build" id="build">v98</div>
     </div>
 
     <div class="row">
@@ -80,6 +80,33 @@
     <button id="pauseBtn" class="touchBtn" type="button">Pause</button>
   </div>
 
-  <script src="game.js?v=97"></script>
+  <div id="summary" class="hidden" role="dialog" aria-modal="true" aria-label="Run summary">
+    <div class="card">
+      <h2 id="summaryTitle">Run Complete</h2>
+      <div id="summaryScore" class="summaryScore">Score: 0</div>
+      <div id="summaryAchievements" class="summaryBlock"></div>
+      <div class="summaryGrid">
+        <div>
+          <div class="summaryHdr">Weapons</div>
+          <div id="summaryWeapons" class="summaryList"></div>
+        </div>
+        <div>
+          <div class="summaryHdr">Magic</div>
+          <div id="summaryMagic" class="summaryList"></div>
+        </div>
+        <div>
+          <div class="summaryHdr">Passives</div>
+          <div id="summaryPassives" class="summaryList"></div>
+        </div>
+      </div>
+      <div class="summaryBtns">
+        <button id="restartBtn" class="btn" type="button">Restart</button>
+        <button id="shareBtn" class="miniBtn" type="button">Share</button>
+      </div>
+      <div id="summaryHint" class="hint"></div>
+    </div>
+  </div>
+
+  <script src="game.js?v=98"></script>
 </body>
 </html>

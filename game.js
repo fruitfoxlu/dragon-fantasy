@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v97';
+const BUILD = 'v98';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1160,7 +1160,7 @@ const weapons = {
     cd: 0,
     baseCooldown: 0.45,
     damage: 12,
-    projectiles: 1,
+    projectiles: 3,
     spread: 0.12,
     speed: 520,
     pierce: 0,
@@ -4341,7 +4341,7 @@ function resetRun() {
   weapons.wand.lvl = 1;
   weapons.wand.baseCooldown = 0.45;
   weapons.wand.damage = 12;
-  weapons.wand.projectiles = 1;
+  weapons.wand.projectiles = 3;
   weapons.wand.pierce = 0;
   weapons.wand.cd = 0;
 
