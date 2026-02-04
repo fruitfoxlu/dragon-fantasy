@@ -1143,6 +1143,8 @@ const weapons = {
     name: 'Meteor',
     lvl: 0,
     kind: 'meteor',
+    followTrail: false,
+    trailDelay: 1.0,
     enabled: false,
     cd: 0,
     baseCooldown: 2.4,
@@ -1198,6 +1200,10 @@ const heals = [];         // {x,y,r, amount}
 const effects = [];
 
 const toast = { text: '', t: 0 };
+
+// Player trail for "meteor follows your previous steps" upgrades
+const playerTrail = []; // {x,y,t} (t in seconds elapsed)
+let trailAcc = 0;
 // effects types:
 // - bolt {type:'bolt', pts:[[x,y]..], t, ttl}
 // - meteor {type:'meteor', x,y, t, ttl, delay, radius, stage:'fall'|'impact'}
@@ -1433,6 +1439,17 @@ function dirFromVec(dx, dy) {
 }
 
 function updatePlayer(dt) {
+  // record trail (every ~0.12s while playing)
+  if (state.mode === 'play') {
+    trailAcc += dt;
+    if (trailAcc >= 0.12) {
+      trailAcc = 0;
+      playerTrail.push({ x: player.x, y: player.y, t: state.elapsed });
+      // keep last ~6 seconds
+      while (playerTrail.length && (state.elapsed - playerTrail[0].t) > 6.0) playerTrail.shift();
+    }
+  }
+
   let dx = 0, dy = 0;
   if (keys.has('KeyW') || keys.has('ArrowUp')) dy -= 1;
   if (keys.has('KeyS') || keys.has('ArrowDown')) dy += 1;
@@ -1607,8 +1624,23 @@ function updateChainLightning(dt) {
 
 function spawnMeteor() {
   const w = weapons.meteor;
-  const tx = player.x + rand(-w.scatter, w.scatter);
-  const ty = player.y + rand(-w.scatter, w.scatter);
+
+  let tx, ty;
+  if (w.followTrail && playerTrail.length) {
+    // target a previous footstep (about trailDelay seconds ago)
+    const targetT = state.elapsed - (w.trailDelay || 1.0);
+    let best = playerTrail[0];
+    for (let i = 0; i < playerTrail.length; i++) {
+      const p = playerTrail[i];
+      if (p.t <= targetT) best = p; else break;
+    }
+    tx = best.x;
+    ty = best.y;
+  } else {
+    tx = player.x + rand(-w.scatter, w.scatter);
+    ty = player.y + rand(-w.scatter, w.scatter);
+  }
+
   effects.push({
     type: 'meteor',
     x: tx,
@@ -2348,6 +2380,12 @@ const UPGRADE_POOL = [
     title: '隕石術：燃燒傷害 +25%',
     desc: '地面灼燒更致命。',
     apply() { weapons.meteor.burnDps = Math.round(weapons.meteor.burnDps * 1.25); weapons.meteor.lvl += 1; }
+  },
+  {
+    id: 'meteor_trail',
+    title: '隕石術：追蹤腳步（延遲）',
+    desc: '隕石會落在你「之前走過的腳步」上。',
+    apply() { weapons.meteor.followTrail = true; weapons.meteor.trailDelay = 1.1; weapons.meteor.lvl += 1; }
   },
 
   // Frost upgrades
@@ -3137,6 +3175,9 @@ function resetRun() {
   toast.text = '';
   toast.t = 0;
 
+  playerTrail.length = 0;
+  trailAcc = 0;
+
   state.elapsed = 0;
   state.kills = 0;
   state.nextBossAt = 300;
@@ -3197,6 +3238,8 @@ function resetRun() {
 
   weapons.meteor.enabled = false;
   weapons.meteor.lvl = 0;
+  weapons.meteor.followTrail = false;
+  weapons.meteor.trailDelay = 1.0;
   weapons.meteor.baseCooldown = 2.4;
   weapons.meteor.impactDamage = 88;
   weapons.meteor.impactRadius = 90;
