@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v86';
+const BUILD = 'v87';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1652,6 +1652,17 @@ function nearestEnemy(fromX = player.x, fromY = player.y) {
   return best;
 }
 
+function nearestEnemies(fromX = player.x, fromY = player.y, n = 1) {
+  // Simple + safe: enemies cap is small (MAX_ENEMIES), sorting is fine.
+  const arr = enemies.map(e => {
+    const dx = e.x - fromX;
+    const dy = e.y - fromY;
+    return { e, d2: dx*dx + dy*dy };
+  });
+  arr.sort((a, b) => a.d2 - b.d2);
+  return arr.slice(0, Math.max(0, n)).map(o => o.e);
+}
+
 function killEnemyAt(index) {
   const e = enemies[index];
   if (!e) return;
@@ -1800,7 +1811,15 @@ function updateProjectileWeapons(dt) {
       continue;
     }
 
+    // aim
     let aimX = 1, aimY = 0;
+
+    // Wand multi-shot: each projectile targets a different nearby enemy (when possible)
+    let wandTargets = null;
+    if (w === weapons.wand && w.projectiles > 1) {
+      wandTargets = nearestEnemies(player.x, player.y, Math.min(w.projectiles, 12));
+    }
+
     if (w.kind === 'auto') {
       const e = nearestEnemy();
       if (!e) continue;
@@ -1814,9 +1833,14 @@ function updateProjectileWeapons(dt) {
     }
 
     for (let i = 0; i < w.projectiles; i++) {
-      const baseAng = Math.atan2(aimY, aimX);
-      const spread = (w.projectiles === 1) ? 0 : (i - (w.projectiles - 1) / 2) * w.spread;
-      const jitter = rand(-w.spread, w.spread) * 0.35;
+      let tx = aimX, ty = aimY;
+      if (wandTargets && wandTargets[i]) {
+        tx = wandTargets[i].x - player.x;
+        ty = wandTargets[i].y - player.y;
+      }
+      const baseAng = Math.atan2(ty, tx);
+      const spread = 0; // multi-target already spreads naturally
+      const jitter = rand(-w.spread, w.spread) * 0.18;
       const ang = baseAng + spread + jitter;
       fireBullet(player.x, player.y, Math.cos(ang), Math.sin(ang), w);
     }
