@@ -1424,6 +1424,10 @@ function updatePlayer(dt) {
     player.anim = 0;
   }
 
+  // keep player in sane world coords (helps some mobile browsers / negative drift)
+  player.x = clamp(player.x, 0, 999999);
+  player.y = clamp(player.y, 0, 999999);
+
   player.invuln = Math.max(0, player.invuln - dt);
 }
 
@@ -2723,6 +2727,21 @@ function draw() {
     ctx.beginPath();
     ctx.arc(sx, sy + 10 * pScale, 13 * pScale, 0, Math.PI * 2);
     ctx.fill();
+
+    // Always-visible marker (players keep mistaking hero for skeleton)
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = 'rgba(246,195,92,.95)';
+    ctx.strokeStyle = 'rgba(0,0,0,.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - 30 * pScale);
+    ctx.lineTo(sx - 8 * pScale, sy - 16 * pScale);
+    ctx.lineTo(sx + 8 * pScale, sy - 16 * pScale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
 
     drawSprite(SPR.hero[player.dir][f], sx, sy, { scale: pScale, alpha });
 
