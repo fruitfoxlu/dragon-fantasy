@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v109';
+const BUILD = 'v110';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1190,8 +1190,8 @@ const weapons = {
     kind: 'forward',
     enabled: false,
     cd: 0,
-    baseCooldown: 0.8,
-    damage: 18,
+    baseCooldown: 0.266,
+    damage: 36,
     projectiles: 5,
     spread: Math.PI / 12, // 15° per arrow (fan)
     fanMax: Math.PI,      // total fan angle cap (180°)
@@ -4673,8 +4673,8 @@ function resetRun() {
 
   weapons.bow.enabled = false;
   weapons.bow.lvl = 0;
-  weapons.bow.baseCooldown = 0.8;
-  weapons.bow.damage = 18;
+  weapons.bow.baseCooldown = 0.266;
+  weapons.bow.damage = 36;
   weapons.bow.projectiles = 5;
   weapons.bow.pierce = 1;
   weapons.bow.cd = 0;
