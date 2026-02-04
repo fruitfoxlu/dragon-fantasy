@@ -74,6 +74,7 @@ body{
   background:rgba(0,0,0,.62);
 }
 #levelup.hidden{display:none}
+#summary.hidden{display:none}
 
 /* chest modal styling (so players don't confuse it with level-up) */
 #levelup[data-mode="chest"] .card{
