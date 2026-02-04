@@ -2739,8 +2739,8 @@ const CHEST_POOL = [
   {
     id: 'chest_frost_big',
     title: { zh: '冰霜王印：衝擊波範圍 +35', en: 'Frost Sigil: Shockwave Radius +35' },
-    desc: { zh: '控場覆蓋更大。', en: 'Bigger crowd-control area.' },
-    apply() { if (weapons.frost.enabled) weapons.frost.maxRadius += 35; }
+    desc: { zh: '冰凍衝擊波 Lv20 後才會生效。控場覆蓋更大。', en: 'Only works after Frost Shockwave reaches Lv20. Bigger crowd-control area.' },
+    apply() { if (weapons.frost.enabled && (weapons.frost.lvl || 0) >= 20) weapons.frost.maxRadius += 35; }
   },
   {
     id: 'chest_meteor_big',
@@ -3171,6 +3171,8 @@ function openChoiceModal(mode, title, poolBase) {
     // gate frost upgrades
     if (u.id.startsWith('frost_') && !weapons.frost.enabled) return false;
     if (u.id === 'unlock_frost' && weapons.frost.enabled) return false;
+    // lock Frost Sigil chest reward until Frost reaches level 20
+    if (u.id === 'chest_frost_big' && (weapons.frost.lvl || 0) < 20) return false;
 
     // gate dragon soul upgrades (force an ordered sequence)
     if (u.id.startsWith('dragon_') && !weapons.dragon.enabled) return false;
