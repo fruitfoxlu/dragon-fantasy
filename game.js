@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v84';
+const BUILD = 'v85';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -2871,11 +2871,11 @@ const CHEST_POOL = [
         return `Doom Shard: +1 (${missing} to go)`;
       }
     },
-    desc: { zh: '收集 3 個碎片才能施放一次毀天滅地。', en: 'Collect 3 shards to cast Doom once.' },
+    desc: { zh: '收集 6 個碎片才能施放一次毀天滅地。', en: 'Collect 6 shards to cast Doom once.' },
     apply() {
       state.doomShards = (state.doomShards || 0) + 1;
       sfxPickup('reward');
-      if ((state.doomShards % 3) === 0) {
+      if ((state.doomShards % 6) === 0) {
         state.doomShards = 0;
         doomStrike(true);
       }
@@ -3314,6 +3314,13 @@ function openChoiceModal(mode, title, poolBase) {
     // lock ultimate lightning until lightning reaches level 20
     if (u.id === 'lightning_nocd' && (weapons.lightning.lvl || 0) < 20) return false;
 
+    // magic unlock levels:
+    // Lv5  Meteor, Lv10 Frost, Lv15 Lightning, Lv20 Dragon
+    if ((u.id === 'unlock_meteor' || u.id.startsWith('meteor_')) && player.level < 5) return false;
+    if ((u.id === 'unlock_frost' || u.id.startsWith('frost_')) && player.level < 10) return false;
+    if ((u.id === 'unlock_lightning' || u.id.startsWith('lightning_')) && player.level < 15) return false;
+    if ((u.id === 'unlock_dragon' || u.id.startsWith('dragon_')) && player.level < 20) return false;
+
     // gate meteor upgrades
     if (u.id.startsWith('meteor_') && !weapons.meteor.enabled) return false;
     if (u.id === 'unlock_meteor' && weapons.meteor.enabled) return false;
@@ -3340,8 +3347,7 @@ function openChoiceModal(mode, title, poolBase) {
   currentChoices = [];
   const used = new Set();
 
-  // Guarantee: every LEVEL UP includes at least one elemental magic option.
-  // Magic = Fire (meteor), Ice (frost), Lightning (chain lightning).
+  // Guarantee: when magic is available for this level, include at least one magic option.
   if (mode === 'levelup') {
     const magicPool = pool.filter(u => (
       u.id === 'unlock_meteor' || u.id.startsWith('meteor_') ||
