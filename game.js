@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v108';
+const BUILD = 'v109';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1319,7 +1319,6 @@ let trailAcc = 0;
 // - meteor {type:'meteor', x,y, t, ttl, delay, radius, stage:'fall'|'impact'}
 // - burn {type:'burn', x,y, t, ttl, radius, dps}
 // - wave {type:'wave', x,y, t, ttl, r0, r1}
-// - wand_laser {type:'wand_laser', x,y, dx,dy, t, ttl, w}
 // - boss_tell / elite_tell (charge telegraph)
 // - boss_slam_warn / boss_slam (AoE warning + damage)
 
@@ -1987,36 +1986,7 @@ function updateProjectileWeapons(dt) {
       aimY = Math.sin(qa);
     }
 
-    // Wand Lv5+: laser mode (infinite range, thick beam)
-    if (w === weapons.wand && (w.lvl || 0) >= 5) {
-      const [dx, dy] = norm(aimX, aimY);
-      effects.push({ type: 'wand_laser', x: player.x, y: player.y, dx, dy, t: 0, ttl: 0.10, w: 22 });
-
-      // damage all enemies along the beam
-      const beamW = 22;
-      const maxDist = 6000; // effectively infinite for our spawn distances
-      for (let ei = enemies.length - 1; ei >= 0; ei--) {
-        const e = enemies[ei];
-        e.laserHitCd = Math.max(0, (e.laserHitCd || 0) - dt);
-        if ((e.laserHitCd || 0) > 0) continue;
-
-        // projection onto beam direction
-        const px = e.x - player.x;
-        const py = e.y - player.y;
-        const tproj = px * dx + py * dy;
-        if (tproj < 0 || tproj > maxDist) continue;
-
-        // perpendicular distance to beam center line
-        const perp = Math.abs(px * (-dy) + py * dx);
-        if (perp <= beamW + e.r) {
-          damageEnemy(e, w.damage, player.x, player.y);
-          e.laserHitCd = 0.12;
-          if (e.hp <= 0) killEnemyAt(ei);
-        }
-      }
-
-    } else {
-      for (let i = 0; i < w.projectiles; i++) {
+    for (let i = 0; i < w.projectiles; i++) {
         let tx = aimX, ty = aimY;
         if (wandTargets && wandTargets[i]) {
           tx = wandTargets[i].x - player.x;
@@ -2034,7 +2004,6 @@ function updateProjectileWeapons(dt) {
         const ang = baseAng + spread + jitter;
         fireBullet(player.x, player.y, Math.cos(ang), Math.sin(ang), w);
       }
-    }
 
     // wand firing can ramp very fast, but clamp for performance
     if (w === weapons.wand) {
@@ -4266,33 +4235,6 @@ function draw() {
       }
 
       ctx.lineWidth = 1;
-    }
-
-    if (fx.type === 'wand_laser') {
-      const a = 1 - fx.t / fx.ttl;
-      const [sx, sy] = worldToScreen(fx.x, fx.y);
-      const len = Math.max(view.w, view.h) * 2;
-      ctx.save();
-      ctx.lineCap = 'round';
-
-      ctx.globalAlpha = 0.55 * a;
-      ctx.strokeStyle = 'rgba(140,220,255,.95)';
-      ctx.lineWidth = (fx.w || 22);
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx + fx.dx * len, sy + fx.dy * len);
-      ctx.stroke();
-
-      // hot core
-      ctx.globalAlpha = 0.85 * a;
-      ctx.strokeStyle = 'rgba(255,255,255,.95)';
-      ctx.lineWidth = Math.max(3, (fx.w || 22) * 0.35);
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx + fx.dx * len, sy + fx.dy * len);
-      ctx.stroke();
-
-      ctx.restore();
     }
 
     if (fx.type === 'meteor') {
