@@ -2055,13 +2055,17 @@ function updateDragonSoul(dt) {
   }
 }
 
-function doomStrike() {
+function doomStrike(free=false) {
   if (state.mode !== 'play' || paused) return;
-  if (state.doomCharges <= 0) return;
+  if (!free) {
+    if (state.doomCharges <= 0) return;
+    state.doomCharges -= 1;
+  }
 
-  state.doomCharges -= 1;
   sfxDoom();
-  toast.text = (lang === 'zh') ? `毀天滅地！(${state.doomCharges})` : `DOOM! (${state.doomCharges})`;
+  toast.text = (lang === 'zh')
+    ? `毀天滅地！(${state.doomCharges})`
+    : `DOOM! (${state.doomCharges})`;
   toast.t = 1.4;
 
   // screen effect
@@ -2704,40 +2708,20 @@ const CHEST_POOL = [
     apply() { player.hp = Math.min(player.hpMax, player.hp + 30); }
   },
   {
-    id: 'chest_xp',
-    title: { zh: '靈魂洪流：獲得大量經驗', en: 'Soul Surge: Gain Lots of XP' },
-    desc: { zh: '立即獲得 +40 XP（可能直接再升級）。', en: 'Gain +40 XP immediately (may trigger another level-up).' },
-    apply() { player.xp += 40 * xpGainMul(player.level); checkLevelUp(); }
-  },
-  {
-    id: 'chest_allcdr',
-    title: { zh: '符文：全武器冷卻 -8%', en: 'Rune: All Weapon Cooldowns -8%' },
-    desc: { zh: '所有武器出手更頻繁。', en: 'All weapons fire more often.' },
+    id: 'chest_vacuum',
+    title: { zh: '靈魂牽引：吸起全地圖經驗', en: 'Soul Vacuum: Pull All XP' },
+    desc: { zh: '把地圖上的魂石全部吸到你身邊。', en: 'Pull all XP gems to you.' },
     apply() {
-      weapons.wand.baseCooldown *= 0.92;
-      weapons.bow.baseCooldown *= 0.92;
-      weapons.lightning.baseCooldown *= 0.92;
-      weapons.meteor.baseCooldown *= 0.92;
-      weapons.frost.baseCooldown *= 0.92;
+      // spawn a vacuum gem at player to trigger global pull behavior
+      vacuumGems.push({ x: player.x, y: player.y, r: 14 });
+      sfxPickup('reward');
     }
   },
   {
-    id: 'chest_blade_orbit',
-    title: { zh: '秘儀：迴旋斬半徑 +18', en: 'Arcana: Blade Orbit Radius +18' },
-    desc: { zh: '刀刃轉得更外圈，命中更安全。', en: 'Blades orbit wider for safer hits.' },
-    apply() { weapons.blades.radius += 18; }
-  },
-  {
-    id: 'chest_frost_big',
-    title: { zh: '冰霜王印：衝擊波範圍 +35', en: 'Frost Sigil: Shockwave Radius +35' },
-    desc: { zh: '冰凍衝擊波 Lv20 後才會生效。控場覆蓋更大。', en: 'Only works after Frost Shockwave reaches Lv20. Bigger crowd-control area.' },
-    apply() { if (weapons.frost.enabled && (weapons.frost.lvl || 0) >= 20) weapons.frost.maxRadius += 35; }
-  },
-  {
-    id: 'chest_meteor_big',
-    title: { zh: '隕火核心：爆炸半徑 +28', en: 'Meteor Core: Explosion Radius +28' },
-    desc: { zh: '隕石更大更狠。', en: 'Bigger, meaner meteors.' },
-    apply() { weapons.meteor.impactRadius += 28; weapons.meteor.burnRadius += 18; }
+    id: 'chest_doom',
+    title: { zh: '毀天滅地：全圖敵人消滅', en: 'Doom: Erase All Enemies' },
+    desc: { zh: '立刻清空地圖上所有敵人。', en: 'Instantly wipe all enemies on the field.' },
+    apply() { doomStrike(true); }
   },
 ];
 
