@@ -244,6 +244,50 @@ function ensureAudio() {
   audio.master.connect(audio.ctx.destination);
 }
 
+function sfxCast(kind) {
+  if (!audio.sfxOn) return;
+  try {
+    ensureAudio();
+    if (audio.ctx.state === 'suspended') audio.ctx.resume();
+    const t = audio.ctx.currentTime;
+
+    // distinct but gentle motifs
+    let base = 520;
+    if (kind === 'meteor') base = 460;
+    if (kind === 'frost') base = 560;
+    if (kind === 'lightning') base = 640;
+
+    const det = 1 + (Math.random() * 0.02 - 0.01);
+    const mk = (freq, when, dur, g0, kind='triangle') => {
+      const o = audio.ctx.createOscillator();
+      const g = audio.ctx.createGain();
+      o.type = kind;
+      o.frequency.setValueAtTime(freq, when);
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(g0, when + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      o.connect(g);
+      g.connect(audio.master);
+      o.start(when);
+      o.stop(when + dur + 0.02);
+    };
+
+    if (kind === 'meteor') {
+      // low "whoom" + sparkle
+      mk(base * det, t, 0.10, 0.04, 'sine');
+      mk(base * 2.0 * det, t + 0.06, 0.07, 0.02, 'triangle');
+    } else if (kind === 'frost') {
+      // airy chime
+      mk(base * det, t, 0.07, 0.03, 'triangle');
+      mk(base * 1.5 * det, t + 0.04, 0.07, 0.02, 'sine');
+    } else if (kind === 'lightning') {
+      // quick zap
+      mk(base * det, t, 0.05, 0.03, 'square');
+      mk(base * 2.0 * det, t + 0.03, 0.06, 0.02, 'triangle');
+    }
+  } catch {}
+}
+
 function sfxPickup(type) {
   if (!audio.sfxOn) return;
   // Subtle, pleasant 32-bit style chime (varied so it won't get annoying)
@@ -1558,6 +1602,7 @@ function updateChainLightning(dt) {
     if (e.hp <= 0) killEnemyAt(i);
   }
 
+  sfxCast('lightning');
   effects.push({ type: 'bolt', pts, t: 0, ttl: 0.16 });
   w.cd = w.baseCooldown;
 }
@@ -1630,12 +1675,14 @@ function updateMeteor(dt) {
   w.cd -= dt;
   if (w.cd > 0) return;
 
+  sfxCast('meteor');
   spawnMeteor();
   w.cd = w.baseCooldown;
 }
 
 function castFrostShockwave() {
   const w = weapons.frost;
+  sfxCast('frost');
   const [fx, fy] = forwardVec(player.dir);
   const baseAng = Math.PI / 3; // 60°
   const stepAng = Math.PI / 6; // +30° per frost level
@@ -2903,7 +2950,8 @@ function draw() {
       if (fx.stage === 'fall') {
         const t01 = clamp(fx.t / fx.delay, 0, 1);
         const r = 10 + 12 * t01;
-        ctx.fillStyle = 'rgba(246,195,92,.14)';
+        // opaque telegraph circle
+        ctx.fillStyle = 'rgba(246,195,92,1)';
         ctx.beginPath();
         ctx.arc(sx, sy, fx.radius * 0.22, 0, Math.PI * 2);
         ctx.fill();
