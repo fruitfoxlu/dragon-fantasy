@@ -70,6 +70,7 @@ const ui = {
   langBtn: document.getElementById('langBtn'),
   doomBtn: document.getElementById('doomBtn'),
   doomTouchBtn: document.getElementById('doomTouchBtn'),
+  awardLine: document.getElementById('awardLine'),
   start: document.getElementById('start'),
   startBtn: document.getElementById('startBtn'),
   levelup: document.getElementById('levelup'),
@@ -1114,7 +1115,13 @@ const state = {
 
   doomCharges: 3,
 
-  // level-up pacing
+  // level-up pacing (strict: one reward per level)
+  awardQueue: [],          // [levelNumber]
+  awardedLevels: {},       // { [levelNumber]: true }
+  currentAwardLevel: null,
+  awardHistory: [],        // [{lvl, text}]
+
+  // legacy pacing flags
   pendingLevelUps: 0,
   lastLevelUpAt: -999,
   lastLevelBatch: null, // {from,to}
@@ -2312,6 +2319,12 @@ function updateEffects(dt) {
   }
 }
 
+function queueLevelAward(lvl) {
+  if (state.awardedLevels[lvl]) return;
+  state.awardedLevels[lvl] = true;
+  state.awardQueue.push(lvl);
+}
+
 function applyLevelStep() {
   player.xp -= player.xpNeed;
   player.level += 1;
@@ -2321,6 +2334,8 @@ function applyLevelStep() {
   } else {
     player.xpNeed = Math.floor(((10 + player.level * 7 + Math.pow(player.level, 1.25)) * 1.25) * 3);
   }
+  // STRICT: exactly one reward per level
+  queueLevelAward(player.level);
 }
 
 function autoPickUpgrade() {
@@ -2376,51 +2391,23 @@ function autoPickUpgrade() {
 }
 
 function checkLevelUp() {
-  // Convert XP into level steps and queue upgrades.
-  // Important: apply level steps even if a modal is open, so level doesn't appear "stuck".
+  // STRICT: XP -> levels; each level queues exactly one reward entry.
   const startLevel = player.level;
   let guard = 0;
   while (player.xp >= player.xpNeed) {
     applyLevelStep();
-    state.pendingLevelUps += 1;
     if (++guard > 200) break; // safety
   }
   if (player.level > startLevel) {
     state.lastLevelBatch = { from: startLevel, to: player.level };
   }
 
+  // Never open multiple times; only open when we're in play.
   if (state.mode !== 'play') return;
-  if (state.pendingLevelUps <= 0) return;
+  if (!state.awardQueue.length) return;
 
-  // If upgrades come in too fast, auto-pick most of them so gameplay doesn't freeze.
-  const minGap = 2.2; // seconds between opening modals
-  if ((state.elapsed - state.lastLevelUpAt) < minGap) {
-    // drain several pending upgrades per frame without pausing
-    const n = Math.min(6, state.pendingLevelUps);
-    for (let i = 0; i < n; i++) autoPickUpgrade();
-    state.pendingLevelUps = Math.max(0, state.pendingLevelUps - n);
-    return;
-  }
-
-  // otherwise open the normal modal.
-  // If many level-ups are queued, auto-pick the bulk so the player doesn't have to tap 10–30 times.
-  if (state.pendingLevelUps >= 3) {
-    const nAuto = state.pendingLevelUps; // auto-pick all
-    for (let i = 0; i < nAuto; i++) autoPickUpgrade();
-    state.pendingLevelUps = 0;
-    state.lastLevelUpAt = state.elapsed;
-    // no modal in bulk case
-    return;
-  }
-
-  // small queue: keep one manual choice
-  if (state.pendingLevelUps > 1) {
-    const nAuto = state.pendingLevelUps - 1;
-    for (let i = 0; i < nAuto; i++) autoPickUpgrade();
-    state.pendingLevelUps = Math.max(0, state.pendingLevelUps - nAuto);
-  }
-
-  state.pendingLevelUps = Math.max(0, state.pendingLevelUps - 1);
+  // Open exactly one reward modal per queued level.
+  state.currentAwardLevel = state.awardQueue.shift();
   state.lastLevelUpAt = state.elapsed;
   openLevelUp();
 }
@@ -2781,14 +2768,12 @@ let currentChoices = [];
 let pendingWeaponUnlock = null;
 
 function openLevelUp() {
-  let rangeTxt = '';
-  if (state.lastLevelBatch && state.lastLevelBatch.to > state.lastLevelBatch.from) {
-    rangeTxt = (lang === 'zh')
-      ? `（Lv ${state.lastLevelBatch.from} → ${state.lastLevelBatch.to}）`
-      : ` (Lv ${state.lastLevelBatch.from} → ${state.lastLevelBatch.to})`;
-  }
-  const extra = state.pendingLevelUps > 0
-    ? (lang === 'zh' ? `（連升剩 ${state.pendingLevelUps}）` : ` (+${state.pendingLevelUps} queued)`)
+  const lvl = state.currentAwardLevel ?? player.level;
+  const rangeTxt = (lang === 'zh')
+    ? `（Lv ${lvl} 獎勵）`
+    : ` (Lv ${lvl} reward)`;
+  const extra = state.awardQueue.length
+    ? (lang === 'zh' ? `（待選 ${state.awardQueue.length}）` : ` (+${state.awardQueue.length} queued)`)
     : '';
   openChoiceModal('levelup', t('levelUpTitle') + rangeTxt + extra, UPGRADE_POOL);
 }
@@ -2953,12 +2938,21 @@ function chooseUpgrade(idx) {
   const u = currentChoices[idx];
   if (!u) { state.choiceLock = false; return; }
   u.apply();
+
+  // Record which level this reward belonged to (strict: one reward per level)
+  const lvl = state.currentAwardLevel;
+  const titleText = (typeof u.title === 'string') ? u.title : (u.title?.[lang] || u.title?.zh || u.title?.en || 'Upgrade');
+  if (lvl != null) {
+    state.awardHistory.unshift({ lvl, text: titleText });
+    if (state.awardHistory.length > 6) state.awardHistory.length = 6;
+  }
+  state.currentAwardLevel = null;
+
   ui.levelup.classList.add('hidden');
   state.mode = 'play';
   paused = false;
 
-  // If more level-ups are pending, resolve them without freezing gameplay.
-  // (checkLevelUp will either auto-pick or open another modal later)
+  // If more rewards are queued, open the next one (one per level, locked by awardQueue)
   checkLevelUp();
 
   requestAnimationFrame(loop);
@@ -3494,6 +3488,21 @@ function updateUI() {
   if (ui.doomBtn) ui.doomBtn.textContent = `Doom: ${state.doomCharges}`;
   if (ui.doomTouchBtn) ui.doomTouchBtn.textContent = `Doom: ${state.doomCharges}`;
 
+  if (ui.awardLine) {
+    if (state.currentAwardLevel != null) {
+      ui.awardLine.textContent = (lang === 'zh')
+        ? `Lv ${state.currentAwardLevel}：等待選擇` 
+        : `Lv ${state.currentAwardLevel}: waiting choice`;
+    } else if (state.awardHistory.length) {
+      const h = state.awardHistory[0];
+      ui.awardLine.textContent = (lang === 'zh')
+        ? `Lv ${h.lvl}：${h.text}`
+        : `Lv ${h.lvl}: ${h.text}`;
+    } else {
+      ui.awardLine.textContent = '';
+    }
+  }
+
   if (ui.hudWeapons) {
     const ws = enabledWeaponKeys();
     ui.hudWeapons.innerHTML = ws.map(k => {
@@ -3605,6 +3614,12 @@ function resetRun() {
   state.kills = 0;
   state.nextBossAt = 300;
   state.doomCharges = 3;
+  state.awardQueue = [];
+  state.awardedLevels = {};
+  state.currentAwardLevel = null;
+  state.awardHistory = [];
+  state.lastLevelBatch = null;
+  state.pendingLevelUps = 0;
 
   // spawn at a tile center so camera feels centered and joystick is stable
   player.x = 16;
