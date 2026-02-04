@@ -236,6 +236,41 @@ function ensureAudio() {
   audio.master.connect(audio.ctx.destination);
 }
 
+function sfxPickup(type) {
+  // Subtle, pleasant 32-bit style chime (varied so it won't get annoying)
+  try {
+    ensureAudio();
+    const t = audio.ctx.currentTime;
+    const base = type === 'chest' ? 740 : 620;
+    const det = 1 + (Math.random() * 0.018 - 0.009);
+    const f1 = base * det;
+    const f2 = base * 1.2599 * det; // minor third
+    const f3 = base * 1.4983 * det; // fifth
+
+    const mk = (freq, when, dur, g0, kind='triangle') => {
+      const o = audio.ctx.createOscillator();
+      const g = audio.ctx.createGain();
+      o.type = kind;
+      o.frequency.setValueAtTime(freq, when);
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(g0, when + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      o.connect(g);
+      g.connect(audio.master);
+      o.start(when);
+      o.stop(when + dur + 0.02);
+    };
+
+    // little arpeggio (fast)
+    mk(f1, t, 0.08, 0.06);
+    mk(f2, t + 0.05, 0.09, 0.05);
+    mk(f3, t + 0.10, 0.10, 0.04);
+
+    // tiny click for chests
+    if (type === 'chest') mk(base * 2, t + 0.02, 0.04, 0.03, 'square');
+  } catch {}
+}
+
 function stopMusic() {
   if (!audio.ctx) return;
   if (audio.timer) {
@@ -1176,7 +1211,7 @@ const weapons = {
     kind: 'cross',
     enabled: false,
     lvl: 0,
-    crosses: 1,
+    crosses: 3,
     radius: 330,
     crossSize: 42,
     damage: 120,
@@ -2039,6 +2074,7 @@ function updateChests(dt) {
     const d = dist(player.x, player.y, c.x, c.y);
     if (d < player.r + c.r) {
       chests.splice(i, 1);
+      sfxPickup('chest');
       openChest();
       return; // modal opened
     }
@@ -2059,6 +2095,7 @@ function updateGems(dt) {
     if (d < player.r + g.r) {
       player.xp += g.xp;
       gems.splice(i, 1);
+      sfxPickup('xp');
       checkLevelUp();
     }
   }
@@ -2227,9 +2264,15 @@ const UPGRADE_POOL = [
   },
   {
     id: 'dragon_more',
-    title: '龍魂：十字 +1',
-    desc: '更多十字同時旋轉。',
-    apply() { weapons.dragon.crosses += 1; weapons.dragon.lvl += 1; }
+    title: '龍魂：十字 +3（3→6）',
+    desc: '一次增加 3 個十字。',
+    apply() { weapons.dragon.crosses = Math.max(6, weapons.dragon.crosses + 3); weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_more2',
+    title: '龍魂：十字 +3（6→9）',
+    desc: '再增加 3 個十字。',
+    apply() { weapons.dragon.crosses = Math.max(9, weapons.dragon.crosses + 3); weapons.dragon.lvl += 1; }
   },
   {
     id: 'dragon_dmg',
@@ -2549,6 +2592,9 @@ function openChoiceModal(mode, title, poolBase) {
     // gate dragon soul upgrades
     if (u.id.startsWith('dragon_') && !weapons.dragon.enabled) return false;
     if (u.id === 'unlock_dragon' && weapons.dragon.enabled) return false;
+    // hide extra cross upgrades when already reached the target
+    if (u.id === 'dragon_more' && weapons.dragon.crosses >= 6) return false;
+    if (u.id === 'dragon_more2' && weapons.dragon.crosses >= 9) return false;
 
     return true;
   });
