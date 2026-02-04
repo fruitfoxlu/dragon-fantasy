@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v110';
+const BUILD = 'v111';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1191,7 +1191,7 @@ const weapons = {
     enabled: false,
     cd: 0,
     baseCooldown: 0.266,
-    damage: 36,
+    damage: 27,
     projectiles: 5,
     spread: Math.PI / 12, // 15° per arrow (fan)
     fanMax: Math.PI,      // total fan angle cap (180°)
@@ -3276,17 +3276,6 @@ const UPGRADE_POOL = [
     apply() { weapons.lightning.shots = Math.min(5, (weapons.lightning.shots || 1) + 1); weapons.lightning.lvl += 1; }
   },
   {
-    id: 'lightning_nocd',
-    title: '雷電鏈：究極（無冷卻）',
-    desc: '雷電鏈 Lv20 後才會出現。究極形態：5 條、50 跳躍、無冷卻。',
-    apply() {
-      weapons.lightning.shots = 5;
-      weapons.lightning.chains = 50;
-      weapons.lightning.baseCooldown = 0.05;
-      weapons.lightning.lvl += 1;
-    }
-  },
-  {
     id: 'lightning_dmg',
     title: '雷電鏈：傷害 +25%',
     desc: '電得更痛。',
@@ -3622,8 +3611,6 @@ function openChoiceModal(mode, title, poolBase) {
     // gate lightning upgrades
     if (u.id.startsWith('lightning_') && !weapons.lightning.enabled) return false;
     if (u.id === 'unlock_lightning' && weapons.lightning.enabled) return false;
-    // lock ultimate lightning until lightning reaches level 20
-    if (u.id === 'lightning_nocd' && (weapons.lightning.lvl || 0) < 20) return false;
 
     // magic unlock levels:
     // Lv5  Meteor, Lv10 Frost, Lv15 Lightning, Lv20 Dragon
@@ -4674,7 +4661,7 @@ function resetRun() {
   weapons.bow.enabled = false;
   weapons.bow.lvl = 0;
   weapons.bow.baseCooldown = 0.266;
-  weapons.bow.damage = 36;
+  weapons.bow.damage = 27;
   weapons.bow.projectiles = 5;
   weapons.bow.pierce = 1;
   weapons.bow.cd = 0;
