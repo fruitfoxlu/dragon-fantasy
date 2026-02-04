@@ -179,6 +179,16 @@ function weaponLabel(key) {
   return t(`w_${key}`) || key;
 }
 
+function nextDragonUpgradeId() {
+  // sequence: (start slow, 2 crosses) -> speed -> +1 cross -> speed -> +1 cross ... until 6
+  if (!weapons.dragon.enabled) return 'unlock_dragon';
+  const w = weapons.dragon;
+  if (w.crosses >= 6) return null;
+  const stage = w.stage || 0;
+  // even stages: speed, odd stages: more
+  return (stage % 2 === 0) ? `dragon_speed_${stage/2+1}` : `dragon_more_${(stage+1)/2}`;
+}
+
 function applyStaticI18n() {
   const set = (id, html) => {
     const el = document.getElementById(id);
@@ -1102,14 +1112,15 @@ const weapons = {
     kind: 'cross',
     enabled: false,
     lvl: 0,
-    crosses: 3,
-    radius: 90,
+    stage: 0,
+    crosses: 2,
+    radius: 120,
     crossSize: 42,
-    damage: 120,
+    damage: 60,
     tick: 0.18,
     ang: 0,
-    angSpeed: 7.8,
-    jitter: 0.7,
+    angSpeed: 1.1,
+    jitter: 0.45,
   },
 };
 
@@ -2166,36 +2177,70 @@ const UPGRADE_POOL = [
     apply() { weapons.holy.pierce += 1; weapons.holy.lvl += 1; }
   },
 
-  // Dragon Soul
+  // Dragon Soul (sequence upgrades)
   {
     id: 'unlock_dragon',
     title: '解鎖 龍魂（Dragon Soul）',
-    desc: '十字繞身旋轉，超高傷害範圍打擊。',
-    apply() { weapons.dragon.enabled = true; weapons.dragon.lvl = Math.max(1, weapons.dragon.lvl); }
+    desc: '低傷高覆蓋：2 個十字貼身慢轉，升級交替提升轉速/數量。',
+    apply() {
+      const w = weapons.dragon;
+      w.enabled = true;
+      w.lvl = Math.max(1, w.lvl);
+      w.stage = 0;
+      w.crosses = 2;
+      w.damage = 60;
+      w.radius = 120;
+      w.angSpeed = 1.1;
+      w.jitter = 0.45;
+    }
   },
   {
-    id: 'dragon_more',
-    title: '龍魂：十字 +3（3→6）',
-    desc: '一次增加 3 個十字。',
-    apply() { weapons.dragon.crosses = Math.max(6, weapons.dragon.crosses + 3); weapons.dragon.lvl += 1; }
+    id: 'dragon_speed_1',
+    title: '龍魂：轉速提升（慢→中）',
+    desc: '先讓它轉得更順手。',
+    apply() { weapons.dragon.angSpeed *= 1.8; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
   {
-    id: 'dragon_more2',
-    title: '龍魂：十字 +3（6→9）',
-    desc: '再增加 3 個十字。',
-    apply() { weapons.dragon.crosses = Math.max(9, weapons.dragon.crosses + 3); weapons.dragon.lvl += 1; }
+    id: 'dragon_more_1',
+    title: '龍魂：數量 +1（2→3）',
+    desc: '多一個十字。',
+    apply() { weapons.dragon.crosses += 1; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
   {
-    id: 'dragon_dmg',
-    title: '龍魂：傷害 +25%',
-    desc: '秒殺小怪更輕鬆。',
-    apply() { weapons.dragon.damage = Math.round(weapons.dragon.damage * 1.25); weapons.dragon.lvl += 1; }
+    id: 'dragon_speed_2',
+    title: '龍魂：轉速提升（中→快）',
+    desc: '掃怪更密。',
+    apply() { weapons.dragon.angSpeed *= 1.6; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
   {
-    id: 'dragon_radius',
-    title: '龍魂：半徑 +20',
-    desc: '掃到更遠的敵人。',
-    apply() { weapons.dragon.radius += 20; weapons.dragon.lvl += 1; }
+    id: 'dragon_more_2',
+    title: '龍魂：數量 +1（3→4）',
+    desc: '覆蓋更完整。',
+    apply() { weapons.dragon.crosses += 1; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_speed_3',
+    title: '龍魂：轉速提升（快→很快）',
+    desc: '幾乎貼身旋轉。',
+    apply() { weapons.dragon.angSpeed *= 1.45; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_more_3',
+    title: '龍魂：數量 +1（4→5）',
+    desc: '再多一個十字。',
+    apply() { weapons.dragon.crosses += 1; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_speed_4',
+    title: '龍魂：轉速提升（很快→爆快）',
+    desc: '最後一段加速。',
+    apply() { weapons.dragon.angSpeed *= 1.35; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_more_4',
+    title: '龍魂：數量 +1（5→6）',
+    desc: '達到 6 個十字。',
+    apply() { weapons.dragon.crosses += 1; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
 
   // Wand
@@ -2500,12 +2545,15 @@ function openChoiceModal(mode, title, poolBase) {
     if (u.id.startsWith('frost_') && !weapons.frost.enabled) return false;
     if (u.id === 'unlock_frost' && weapons.frost.enabled) return false;
 
-    // gate dragon soul upgrades
+    // gate dragon soul upgrades (force an ordered sequence)
     if (u.id.startsWith('dragon_') && !weapons.dragon.enabled) return false;
     if (u.id === 'unlock_dragon' && weapons.dragon.enabled) return false;
-    // hide extra cross upgrades when already reached the target
-    if (u.id === 'dragon_more' && weapons.dragon.crosses >= 6) return false;
-    if (u.id === 'dragon_more2' && weapons.dragon.crosses >= 9) return false;
+
+    const nextD = nextDragonUpgradeId();
+    if (u.id.startsWith('dragon_')) {
+      if (!nextD) return false;
+      if (u.id !== nextD) return false;
+    }
 
     return true;
   });
