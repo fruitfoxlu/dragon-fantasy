@@ -1213,8 +1213,9 @@ function spawnEnemy() {
   const rangerChance = clamp(0.12 + state.elapsed / 260 * 0.05, 0.12, 0.22);
   const eliteChance = clamp(0.02 + state.elapsed / 420 * 0.03, 0.02, 0.08);
 
-  const type = (Math.random() < rangerChance) ? 'ranger' : 'melee';
+  let type = (Math.random() < rangerChance) ? 'ranger' : 'melee';
   const elite = Math.random() < eliteChance;
+  const big = (!elite && Math.random() < 0.14); // second mob variant: big brute
 
   let r = 11 + tier * 1.5;
   let hp = 24 + tier * 10 + rand(0, 10);
@@ -1249,6 +1250,15 @@ function spawnEnemy() {
     speed *= 0.95;
   }
 
+  if (big) {
+    // big brute: 2x size, 2x HP, 2x speed
+    r *= 2.0;
+    hp *= 2.0;
+    speed *= 2.0;
+    // force melee so it feels distinct
+    type = 'melee';
+  }
+
   if (elite) {
     r *= 5.0;
     hp *= 15.0; // 5x tougher than before (was 3.0)
@@ -1261,6 +1271,7 @@ function spawnEnemy() {
     r,
     hp,
     speed,
+    big,
     touchDmg: (10 + tier * 2) * (elite ? 1.25 : 1),
     vx: 0,
     vy: 0,
@@ -2804,7 +2815,7 @@ function draw() {
     const f = frozen ? 0 : (Math.floor(e.anim * 8) % 4);
 
     const base = (e.type === 'ranger') ? SPR.skullRanger : SPR.skullMelee;
-    const scale = e.elite ? 5.0 : 1.0;
+    const scale = e.elite ? 5.0 : (e.big ? 2.0 : 1.0);
     const alpha = frozen ? 0.75 : 1;
 
     // Elite visual: add a golden helmet overlay + glowing eyes
