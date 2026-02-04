@@ -988,7 +988,7 @@ const state = {
   kills: 0,
   camera: { x: 0, y: 0 },
 
-  nextBossAt: 150,
+  nextBossAt: 300,
 };
 
 const player = {
@@ -1305,8 +1305,8 @@ function killEnemyAt(index) {
     }
   } else {
     // Normal mobs: small chance to drop a healing potion.
-    if (Math.random() < 0.06) {
-      heals.push({ x: e.x, y: e.y, r: 12, amount: 12 });
+    if (Math.random() < 0.03) {
+      heals.push({ x: e.x, y: e.y, r: 12, amount: 25 });
     }
   }
 
@@ -2673,7 +2673,7 @@ function loop(now) {
     const bossAlive = enemies.some(e => e.type === 'boss');
     if (!bossAlive && state.elapsed >= state.nextBossAt) {
       spawnBoss();
-      state.nextBossAt += 150;
+      state.nextBossAt += 300;
     }
 
     updateWeapons(dt);
@@ -2710,7 +2710,7 @@ function resetRun() {
 
   state.elapsed = 0;
   state.kills = 0;
-  state.nextBossAt = 150;
+  state.nextBossAt = 300;
 
   // spawn at a tile center so camera feels centered and joystick is stable
   player.x = 16;
