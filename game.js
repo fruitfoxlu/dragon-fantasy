@@ -66,7 +66,6 @@ const ui = {
   kills: document.getElementById('kills'),
   time: document.getElementById('time'),
   hpFill: document.getElementById('hpFill'),
-  xpFill: document.getElementById('xpFill'),
   sfxBtn: document.getElementById('sfxBtn'),
   langBtn: document.getElementById('langBtn'),
   start: document.getElementById('start'),
@@ -3107,10 +3106,6 @@ function updateUI() {
   ui.level.textContent = String(player.level);
   ui.xp.textContent = String(player.xp | 0);
   ui.xpNeed.textContent = String(player.xpNeed);
-  if (ui.xpFill) {
-    const xp01 = clamp(player.xpNeed ? (player.xp / player.xpNeed) : 0, 0, 1);
-    ui.xpFill.style.width = `${Math.round(xp01 * 100)}%`;
-  }
   ui.kills.textContent = String(state.kills);
   ui.time.textContent = formatTime(state.elapsed | 0);
 

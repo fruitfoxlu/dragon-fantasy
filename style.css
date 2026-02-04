@@ -116,10 +116,6 @@ body{
 .hpBar{width:140px; height:10px; border-radius:999px; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.12); overflow:hidden}
 .hpFill{height:100%; width:50%; background:linear-gradient(90deg, rgba(70,220,120,.95), rgba(246,195,92,.95));}
 
-/* XP bar (next level progress) */
-.xpBar{width:140px; height:6px; border-radius:999px; background:rgba(0,0,0,.30); border:1px solid rgba(255,255,255,.10); overflow:hidden; margin-top:4px}
-.xpFill{height:100%; width:0%; background:linear-gradient(90deg, rgba(124,242,208,.95), rgba(110,160,255,.95));}
-
 /* Touch controls (mobile) */
 #touch{
   position:fixed;
