@@ -2894,7 +2894,12 @@ const UPGRADE_POOL = [
     id: 'unlock_blades',
     title: '解鎖 迴旋斬（Whirling Blades）',
     desc: '刀刃圍繞你旋轉，碰到敵人造成傷害。',
-    apply() { if (tryEnableWeapon('blades')) weapons.blades.lvl = Math.max(1, weapons.blades.lvl); }
+    apply() {
+      if (tryEnableWeapon('blades')) {
+        weapons.blades.lvl = Math.max(1, weapons.blades.lvl);
+        weapons.blades.blades = Math.max(2, weapons.blades.blades);
+      }
+    }
   },
   {
     id: 'unlock_lightning',
@@ -4019,7 +4024,7 @@ function resetRun() {
 
   weapons.blades.enabled = false;
   weapons.blades.lvl = 0;
-  weapons.blades.blades = 1;
+  weapons.blades.blades = 2;
   weapons.blades.damage = 14;
   weapons.blades.tick = 0.22;
   weapons.blades.ang = 0;
