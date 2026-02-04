@@ -97,6 +97,7 @@ body{
 .hero{margin:0 0 6px; font-size:28px; letter-spacing:.5px; color:var(--accent)}
 .heroSub{color:var(--muted); margin-bottom:12px}
 .lore{color:rgba(243,241,231,.84); font-size:13px; line-height:1.35; margin:0 0 12px}
+.byline{display:inline-block; font-size:12px; color:rgba(124,242,208,.95); font-weight:800; letter-spacing:.2px}
 .bullets{margin:0 0 14px; padding-left:18px; color:var(--text)}
 .bullets li{margin:6px 0; color:rgba(243,241,231,.92)}
 .btn{
