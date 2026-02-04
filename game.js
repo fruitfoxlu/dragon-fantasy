@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v98';
+const BUILD = 'v99';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -82,6 +82,17 @@ const ui = {
   hudMagic: document.getElementById('hudMagic'),
   hudChestHint: document.getElementById('hudChestHint'),
   hudPassives: document.getElementById('hudPassives'),
+
+  summary: document.getElementById('summary'),
+  summaryTitle: document.getElementById('summaryTitle'),
+  summaryScore: document.getElementById('summaryScore'),
+  summaryAchievements: document.getElementById('summaryAchievements'),
+  summaryWeapons: document.getElementById('summaryWeapons'),
+  summaryMagic: document.getElementById('summaryMagic'),
+  summaryPassives: document.getElementById('summaryPassives'),
+  summaryHint: document.getElementById('summaryHint'),
+  restartBtn: document.getElementById('restartBtn'),
+  shareBtn: document.getElementById('shareBtn'),
 };
 
 // ---------- helpers
@@ -1124,6 +1135,13 @@ const state = {
   lastLevelUpAt: -999,
   lastLevelBatch: null, // {from,to}
   choiceLock: false,
+
+  // Lv50 final boss arena duel
+  phase: 'horde', // horde | final | victory
+  finalBossStarted: false,
+  finalBossDefeated: false,
+  finalBossStartAt: null,
+  runEndedAt: null,
 };
 
 const player = {
@@ -1160,7 +1178,7 @@ const weapons = {
     cd: 0,
     baseCooldown: 0.45,
     damage: 12,
-    projectiles: 3,
+    projectiles: 2,
     spread: 0.12,
     speed: 520,
     pierce: 0,
@@ -1634,6 +1652,112 @@ function spawnBoss() {
   };
 
   enemies.push(boss);
+}
+
+function spawnFinalBoss() {
+  // Lv50 arena duel: one huge boss, no minions.
+  const rr = Math.max(120, Math.min(view.w, view.h) * 0.22);
+  const sx = player.x + rand(220, 280) * (Math.random() < 0.5 ? -1 : 1);
+  const sy = player.y + rand(-160, 160);
+
+  const boss = {
+    id: enemyIdSeq++,
+    x: sx,
+    y: sy,
+    r: rr,
+    hp: 18000,
+    speed: 72,
+    touchDmg: 48,
+    vx: 0,
+    vy: 0,
+    frozenUntil: 0,
+    burnUntil: 0,
+    burnDps: 0,
+    bladeHitCd: 0,
+
+    type: 'boss',
+    elite: true,
+    finalBoss: true,
+    purpleBoss: true,
+    megaBoss: true,
+    dir: 0,
+    anim: 0,
+
+    // attacks
+    slamCd: 3.8,
+    slamWindup: 0,
+    pulseCd: 2.6,
+    orbCd: 0.22,
+    bladeAng: rand(0, Math.PI * 2),
+    bladeDmgCd: 0,
+  };
+
+  enemies.push(boss);
+  return boss;
+}
+
+function startFinalBossDuel() {
+  if (state.finalBossStarted) return;
+  state.finalBossStarted = true;
+  state.phase = 'final';
+  state.finalBossStartAt = state.elapsed;
+
+  // Clear the arena: no minions, no loot distractions.
+  enemies.length = 0;
+  enemyBullets.length = 0;
+  gems.length = 0;
+  chests.length = 0;
+  vacuumGems.length = 0;
+  heals.length = 0;
+  effects.length = 0;
+
+  toast.text = (lang === 'zh') ? '最終決鬥：龍焰暴君降臨！' : 'Final Duel: The Dragon Tyrant descends!';
+  toast.t = 2.4;
+
+  spawnFinalBoss();
+}
+
+function endRunVictory() {
+  if (state.phase === 'victory') return;
+  state.phase = 'victory';
+  state.finalBossDefeated = true;
+  state.runEndedAt = state.elapsed;
+  state.mode = 'summary';
+
+  // Hide any modal that might be open
+  ui.levelup?.classList.add('hidden');
+  ui.start?.classList.add('hidden');
+
+  // Build summary UI
+  const timeSec = Math.max(0, state.runEndedAt || state.elapsed);
+  const score = Math.floor(state.kills * 10 + timeSec * 2 + player.level * 50);
+
+  const ach = [];
+  ach.push((lang === 'zh') ? '屠龍者：擊敗最終 Boss' : 'Dragon Slayer: Defeated the final boss');
+  if (player.hp > player.hpMax * 0.75) ach.push((lang === 'zh') ? '堅韌：高血量通關' : 'Unbroken: High-HP finish');
+  const anyMax = [...WEAPON_KEYS, ...MAGIC_KEYS].some(k => (weapons[k]?.enabled && (weapons[k].lvl || 0) >= 8));
+  if (anyMax) ach.push((lang === 'zh') ? '武裝到牙齒：至少一項升到高等級' : 'Arsenal: At least one high-level weapon');
+
+  const lines = (items) => items.length ? items.map(s => `• ${s}`).join('<br/>') : (lang === 'zh' ? '（無）' : '(none)');
+
+  const wLines = WEAPON_KEYS.filter(k => weapons[k].enabled).map(k => `${weaponLabel(k)} Lv${weapons[k].lvl || 0}`);
+  const mLines = MAGIC_KEYS.filter(k => weapons[k].enabled).map(k => `${weaponLabel(k)} Lv${weapons[k].lvl || 0}`);
+  const p = player.passives || {};
+  const pLines = [
+    (lang === 'zh') ? `生命 Lv${p.hp || 0}` : `HP Lv${p.hp || 0}`,
+    (lang === 'zh') ? `速度 Lv${p.speed || 0}` : `Speed Lv${p.speed || 0}`,
+    (lang === 'zh') ? `磁力 Lv${p.magnet || 0}` : `Magnet Lv${p.magnet || 0}`,
+  ];
+
+  if (ui.summaryTitle) ui.summaryTitle.textContent = (lang === 'zh') ? '冒險完成' : 'Run Complete';
+  if (ui.summaryScore) ui.summaryScore.textContent = (lang === 'zh') ? `分數：${score}（擊殺 ${state.kills} · ${formatTime(timeSec | 0)} · Lv${player.level}）` : `Score: ${score} (Kills ${state.kills} · ${formatTime(timeSec | 0)} · Lv${player.level})`;
+  if (ui.summaryAchievements) ui.summaryAchievements.innerHTML = `<div class="summaryHdr">${(lang === 'zh') ? '成就' : 'Achievements'}</div>${lines(ach)}`;
+  if (ui.summaryWeapons) ui.summaryWeapons.innerHTML = lines(wLines);
+  if (ui.summaryMagic) ui.summaryMagic.innerHTML = lines(mLines);
+  if (ui.summaryPassives) ui.summaryPassives.innerHTML = lines(pLines);
+  if (ui.summaryHint) ui.summaryHint.textContent = (lang === 'zh') ? '提示：按 Enter 重新開始 · Share 可分享本次成績' : 'Tip: Press Enter to restart · Share to share your run';
+
+  ui.summary?.classList.remove('hidden');
 }
 
 function fireBullet(fromX, fromY, dirX, dirY, spec) {
@@ -2133,7 +2257,38 @@ function updateBullets(dt) {
     if (b.life <= 0) bullets.splice(i, 1);
   }
 
-  // enemy bullets disabled
+  // enemy bullets (final boss)
+  for (let i = enemyBullets.length - 1; i >= 0; i--) {
+    const b = enemyBullets[i];
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.life -= dt;
+    b.age = (b.age || 0) + dt;
+
+    // expire
+    if (b.life <= 0) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    // collide with player (after a short safe delay)
+    const arm = b.arm ?? 0;
+    if ((b.age || 0) >= arm) {
+      const d = dist(b.x, b.y, player.x, player.y);
+      if (d < (b.r || 6) + player.r) {
+        if (player.invuln <= 0) {
+          player.hp -= (b.dmg || 18);
+          sfxHit();
+          player.invuln = 0.55;
+          const [nx, ny] = norm(player.x - b.x, player.y - b.y);
+          player.x += nx * 18;
+          player.y += ny * 18;
+        }
+        enemyBullets.splice(i, 1);
+        continue;
+      }
+    }
+  }
 }
 
 function collideBullets() {
@@ -2703,6 +2858,11 @@ function applyLevelStep() {
 
   // STRICT: exactly one reward per level
   queueLevelAward(player.level);
+
+  // Lv50: final boss arena duel
+  if (player.level === 50) {
+    startFinalBossDuel();
+  }
 }
 
 function autoPickUpgrade() {
@@ -3602,7 +3762,13 @@ function draw() {
     drawSprite(isBow ? SPR.orbGold : SPR.orbTeal, sx, sy, { scale: 1 });
   }
 
-  // enemy bullets disabled
+  // enemy bullets (final boss)
+  for (const b of enemyBullets) {
+    const [sx, sy] = worldToScreen(b.x, b.y);
+    const a = (b.arm && (b.age || 0) < b.arm) ? 0.35 : 0.95;
+    const spr = (b.kind === 'pulse') ? SPR.orbGold : (b.kind === 'orb' ? SPR.orbDoom : SPR.orbGold);
+    drawSprite(spr, sx, sy, { scale: 1.15, alpha: a });
+  }
 
   // vacuum gems
   for (const v of vacuumGems) {
@@ -4220,60 +4386,63 @@ function loop(now) {
       resetJoy();
     }
 
-    // spawn pacing ramps up
-    enemySpawnAcc += dt;
-    // Spawn pacing: every 60s, spawn speed +50% (i.e., interval * 2/3).
-    const minute = Math.floor(state.elapsed / 60);
-    const speedMul = Math.pow(1.5, minute);
-    const spawnRateBase = Math.max(0.14, 0.55 - state.elapsed / 180);
-    const spawnRate = Math.max(0.06, spawnRateBase / speedMul);
+    // Spawning: disabled during Lv50 final boss arena duel
+    if (state.phase === 'horde') {
+      // spawn pacing ramps up
+      enemySpawnAcc += dt;
+      // Spawn pacing: every 60s, spawn speed +50% (i.e., interval * 2/3).
+      const minute = Math.floor(state.elapsed / 60);
+      const speedMul = Math.pow(1.5, minute);
+      const spawnRateBase = Math.max(0.14, 0.55 - state.elapsed / 180);
+      const spawnRate = Math.max(0.06, spawnRateBase / speedMul);
 
-    while (enemySpawnAcc > spawnRate) {
-      enemySpawnAcc -= spawnRate;
-      // double (actually ~2x) mob count
-      spawnEnemy();
-      spawnEnemy();
-      if (Math.random() < 0.30) spawnEnemy();
-    }
-
-    // Boss spawn (fixed time gate)
-    const bossAlive = enemies.some(e => e.type === 'boss');
-    if (state.elapsed >= 360 && !bossAlive && state.elapsed >= state.nextBossAt) {
-      spawnBoss();
-      state.nextBossAt += 300;
-    }
-
-    // Formation spawns (unlocked by time; probabilistic; squads only)
-    // IMPORTANT: cap spawns to avoid runaway enemy counts (crash / freeze on mobile).
-    const MAX_ENEMIES = 200;
-
-    // Shield wall unlock at 3:00
-    if (state.elapsed >= 180 && state.elapsed >= state.nextShieldWallAt) {
-      const room = Math.max(0, MAX_ENEMIES - enemies.length);
-      const canForm = Math.floor(room / 20);
-      const mins = (state.elapsed - 180) / 60;
-      const p = clamp(0.12 + mins * 0.06, 0.12, 0.42); // slowly rises
-      if (canForm > 0 && Math.random() < p) {
-        spawnShieldWall(((Math.random() * 4) | 0));
-        state.shieldWaves += 1;
-        state.nextShieldWallAt = state.elapsed + 60; // at most ~1/min
-      } else {
-        state.nextShieldWallAt = state.elapsed + 10; // retry soon
+      while (enemySpawnAcc > spawnRate) {
+        enemySpawnAcc -= spawnRate;
+        // double (actually ~2x) mob count
+        spawnEnemy();
+        spawnEnemy();
+        if (Math.random() < 0.30) spawnEnemy();
       }
-    }
 
-    // Cavalry unlock at 4:00
-    if (state.elapsed >= 240 && state.elapsed >= state.nextCavAt) {
-      const room = Math.max(0, MAX_ENEMIES - enemies.length);
-      const canForm = Math.floor(room / 15);
-      const mins = (state.elapsed - 240) / 60;
-      const p = clamp(0.10 + mins * 0.05, 0.10, 0.35);
-      if (canForm > 0 && Math.random() < p) {
-        spawnCavalryV(((Math.random() * 4) | 0));
-        state.cavWaves += 1;
-        state.nextCavAt = state.elapsed + 60; // at most ~1/min
-      } else {
-        state.nextCavAt = state.elapsed + 10;
+      // Boss spawn (fixed time gate)
+      const bossAlive = enemies.some(e => e.type === 'boss');
+      if (state.elapsed >= 360 && !bossAlive && state.elapsed >= state.nextBossAt) {
+        spawnBoss();
+        state.nextBossAt += 300;
+      }
+
+      // Formation spawns (unlocked by time; probabilistic; squads only)
+      // IMPORTANT: cap spawns to avoid runaway enemy counts (crash / freeze on mobile).
+      const MAX_ENEMIES = 200;
+
+      // Shield wall unlock at 3:00
+      if (state.elapsed >= 180 && state.elapsed >= state.nextShieldWallAt) {
+        const room = Math.max(0, MAX_ENEMIES - enemies.length);
+        const canForm = Math.floor(room / 20);
+        const mins = (state.elapsed - 180) / 60;
+        const p = clamp(0.12 + mins * 0.06, 0.12, 0.42); // slowly rises
+        if (canForm > 0 && Math.random() < p) {
+          spawnShieldWall(((Math.random() * 4) | 0));
+          state.shieldWaves += 1;
+          state.nextShieldWallAt = state.elapsed + 60; // at most ~1/min
+        } else {
+          state.nextShieldWallAt = state.elapsed + 10; // retry soon
+        }
+      }
+
+      // Cavalry unlock at 4:00
+      if (state.elapsed >= 240 && state.elapsed >= state.nextCavAt) {
+        const room = Math.max(0, MAX_ENEMIES - enemies.length);
+        const canForm = Math.floor(room / 15);
+        const mins = (state.elapsed - 240) / 60;
+        const p = clamp(0.10 + mins * 0.05, 0.10, 0.35);
+        if (canForm > 0 && Math.random() < p) {
+          spawnCavalryV(((Math.random() * 4) | 0));
+          state.cavWaves += 1;
+          state.nextCavAt = state.elapsed + 60; // at most ~1/min
+        } else {
+          state.nextCavAt = state.elapsed + 10;
+        }
       }
     }
 
@@ -4341,7 +4510,7 @@ function resetRun() {
   weapons.wand.lvl = 1;
   weapons.wand.baseCooldown = 0.45;
   weapons.wand.damage = 12;
-  weapons.wand.projectiles = 3;
+  weapons.wand.projectiles = 2;
   weapons.wand.pierce = 0;
   weapons.wand.cd = 0;
 
