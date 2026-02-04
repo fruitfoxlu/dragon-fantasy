@@ -288,6 +288,31 @@ function sfxCast(kind) {
   } catch {}
 }
 
+function sfxHit() {
+  if (!audio.sfxOn) return;
+  try {
+    ensureAudio();
+    if (audio.ctx.state === 'suspended') audio.ctx.resume();
+    const t = audio.ctx.currentTime;
+    const base = 220 * (1 + (Math.random()*0.02-0.01));
+    const mk = (freq, when, dur, g0, kind='square') => {
+      const o = audio.ctx.createOscillator();
+      const g = audio.ctx.createGain();
+      o.type = kind;
+      o.frequency.setValueAtTime(freq, when);
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(g0, when + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      o.connect(g);
+      g.connect(audio.master);
+      o.start(when);
+      o.stop(when + dur + 0.02);
+    };
+    mk(base, t, 0.06, 0.05, 'square');
+    mk(base*0.66, t+0.03, 0.08, 0.035, 'triangle');
+  } catch {}
+}
+
 function sfxPickup(type) {
   if (!audio.sfxOn) return;
   // Subtle, pleasant 32-bit style chime (varied so it won't get annoying)
@@ -1970,6 +1995,7 @@ function updateEnemies(dt) {
     if (d2 < e.r + player.r) {
       if (player.invuln <= 0) {
         player.hp -= e.touchDmg;
+        sfxHit();
         player.invuln = (e.type === 'boss') ? 0.70 : 0.55;
         const [nx, ny] = norm(player.x - e.x, player.y - e.y);
         player.x += nx * (e.type === 'boss' ? 26 : 14);
@@ -2152,6 +2178,7 @@ function updateEffects(dt) {
         const d = dist(fx.x, fx.y, player.x, player.y);
         if (d <= fx.radius + player.r && player.invuln <= 0) {
           player.hp -= 34;
+          sfxHit();
           player.invuln = 0.65;
           const [nx, ny] = norm(player.x - fx.x, player.y - fx.y);
           player.x += nx * 34;
@@ -2251,13 +2278,13 @@ const UPGRADE_POOL = [
   {
     id: 'unlock_dragon',
     title: '解鎖 龍魂（Dragon Soul）',
-    desc: '低傷高覆蓋：2 個十字貼身慢轉，升級交替提升轉速/數量。',
+    desc: '低傷高覆蓋：4 個十字貼身慢轉，升級交替提升轉速/數量。',
     apply() {
       const w = weapons.dragon;
       w.enabled = true;
       w.lvl = Math.max(1, w.lvl);
       w.stage = 0;
-      w.crosses = 2;
+      w.crosses = 4;
       w.damage = 60;
       w.radius = 120;
       w.angSpeed = 1.1;
@@ -2272,7 +2299,7 @@ const UPGRADE_POOL = [
   },
   {
     id: 'dragon_more_1',
-    title: '龍魂：數量 +1（2→3）',
+    title: '龍魂：數量 +1（4→5）',
     desc: '多一個十字。',
     apply() { weapons.dragon.crosses += 1; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
@@ -2284,8 +2311,8 @@ const UPGRADE_POOL = [
   },
   {
     id: 'dragon_more_2',
-    title: '龍魂：數量 +1（3→4）',
-    desc: '覆蓋更完整。',
+    title: '龍魂：數量 +1（5→6）',
+    desc: '達到 6 個十字。',
     apply() { weapons.dragon.crosses += 1; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
   {
@@ -2295,10 +2322,16 @@ const UPGRADE_POOL = [
     apply() { weapons.dragon.angSpeed *= 1.45; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
   {
+    id: 'dragon_speed_3',
+    title: '龍魂：轉速提升（快→很快）',
+    desc: '幾乎貼身旋轉。',
+    apply() { weapons.dragon.angSpeed *= 1.45; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
     id: 'dragon_more_3',
-    title: '龍魂：數量 +1（4→5）',
-    desc: '再多一個十字。',
-    apply() { weapons.dragon.crosses += 1; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+    title: '龍魂：數量 +1（6已滿）',
+    desc: '（已達上限）',
+    apply() { weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
   {
     id: 'dragon_speed_4',
@@ -2308,9 +2341,9 @@ const UPGRADE_POOL = [
   },
   {
     id: 'dragon_more_4',
-    title: '龍魂：數量 +1（5→6）',
-    desc: '達到 6 個十字。',
-    apply() { weapons.dragon.crosses += 1; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+    title: '龍魂：數量 +1（6已滿）',
+    desc: '（已達上限）',
+    apply() { weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
 
   // Wand
