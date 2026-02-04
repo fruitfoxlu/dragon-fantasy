@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v68';
+const BUILD = 'v69';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1111,7 +1111,7 @@ const state = {
   kills: 0,
   camera: { x: 0, y: 0 },
 
-  nextBossAt: 300,
+  nextBossAt: 60,
 
   doomShards: 0, // collect 3 shards to cast once
 
@@ -4069,7 +4069,7 @@ function resetRun() {
 
   state.elapsed = 0;
   state.kills = 0;
-  state.nextBossAt = 300;
+  state.nextBossAt = 60;
   state.doomShards = 0;
   state.awardQueue = [];
   state.awardedLevels = {};
