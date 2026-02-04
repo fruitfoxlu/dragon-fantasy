@@ -1624,17 +1624,21 @@ function updateMeteor(dt) {
 
 function castFrostShockwave() {
   const w = weapons.frost;
+  const [fx, fy] = forwardVec(player.dir);
   effects.push({
-    type: 'wave',
+    type: 'cone',
     x: player.x,
     y: player.y,
+    fx,
+    fy,
     t: 0,
     ttl: w.maxRadius / w.speed,
     r0: 0,
     r1: w.maxRadius,
+    ang: Math.PI * 0.55, // ~99° cone
   });
 
-  // actual collision handled in updateEffects per frame (expanding ring)
+  // collision handled in updateEffects per frame (expanding cone)
 }
 
 function updateFrostShockwave(dt) {
@@ -2022,24 +2026,34 @@ function updateEffects(dt) {
       }
     }
 
-    if (fx.type === 'wave') {
+    if (fx.type === 'cone') {
       const w = weapons.frost;
       const t01 = clamp(fx.t / fx.ttl, 0, 1);
       const r = fx.r0 + (fx.r1 - fx.r0) * t01;
-      const band = 12;
+      const band = 14;
+      const fLen = Math.hypot(fx.fx, fx.fy) || 1;
+      const fwx = fx.fx / fLen;
+      const fwy = fx.fy / fLen;
+      const cosHalf = Math.cos((fx.ang || (Math.PI * 0.55)) / 2);
 
       for (const e of enemies) {
-        const d = dist(fx.x, fx.y, e.x, e.y);
+        const dx = e.x - fx.x;
+        const dy = e.y - fx.y;
+        const d = Math.hypot(dx, dy);
+        if (d < 1) continue;
+
+        // only in front cone
+        const dot = (dx / d) * fwx + (dy / d) * fwy;
+        if (dot < cosHalf) continue;
+
+        // hit band near expanding radius
         if (d >= r - band && d <= r + band) {
-          // hit once per wave by using a temporary flag
           if (!e._waveHitAt || now - e._waveHitAt > 0.5) {
             e._waveHitAt = now;
             damageEnemy(e, w.damage);
-            // knockback outward
             const [nx, ny] = norm(e.x - fx.x, e.y - fx.y);
             e.vx += nx * w.knock;
             e.vy += ny * w.knock;
-            // freeze
             e.frozenUntil = Math.max(e.frozenUntil, now + w.freezeSec);
           }
         }
@@ -2847,6 +2861,23 @@ function draw() {
         ctx.arc(sx, sy, fx.radius, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+
+    if (fx.type === 'cone') {
+      const t01 = clamp(fx.t / fx.ttl, 0, 1);
+      const r = fx.r0 + (fx.r1 - fx.r0) * t01;
+      const [sx, sy] = worldToScreen(fx.x, fx.y);
+      const ang = fx.ang || (Math.PI * 0.55);
+      const a0 = Math.atan2(fx.fy, fx.fx) - ang / 2;
+      const a1 = Math.atan2(fx.fy, fx.fx) + ang / 2;
+      ctx.strokeStyle = 'rgba(120,190,255,.62)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.arc(sx, sy, r, a0, a1);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.lineWidth = 1;
     }
 
     if (fx.type === 'wave') {
