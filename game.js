@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v73';
+const BUILD = 'v74';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -2081,19 +2081,17 @@ function updateDragonSoul(dt) {
 }
 
 function doomPulse() {
-  // one-time full-screen damage (no loops/recursion)
+  // one-time full-screen wipe (independent of any weapon stats)
   sfxDoom();
   toast.text = (lang === 'zh') ? '毀天滅地！' : 'DOOM!';
-  toast.t = 1.4;
-  effects.push({ type: 'doom', t: 0, ttl: 0.55 });
+  toast.t = 1.2;
 
-  // deal a big chunk of damage once (doesn't necessarily wipe)
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    const e = enemies[i];
-    const dmg = Math.max(40, e.hp * 0.65); // chunk; leaves survivors
-    damageEnemy(e, dmg, player.x, player.y);
-    if (e.hp <= 0) killEnemyAt(i);
-  }
+  // white flash
+  effects.push({ type: 'flash', t: 0, ttl: 0.18, color: 'rgba(255,255,255,1)' });
+
+  // wipe enemies without triggering loot chains (prevents doom->drops->doom loops)
+  state.kills += enemies.length;
+  enemies.length = 0;
 }
 
 function doomStrike(free=false) {
@@ -3677,15 +3675,11 @@ function draw() {
 
   // effects: lightning bolts & meteors & wave
   for (const fx of effects) {
-    if (fx.type === 'doom') {
+    if (fx.type === 'flash') {
       const a = 1 - fx.t / fx.ttl;
-      // full-screen flash + vignette
       ctx.save();
       ctx.globalAlpha = 0.85 * a;
-      ctx.fillStyle = 'rgba(180,90,255,1)';
-      ctx.fillRect(0, 0, view.w, view.h);
-      ctx.globalAlpha = 0.55 * a;
-      ctx.fillStyle = 'rgba(0,0,0,1)';
+      ctx.fillStyle = fx.color || 'rgba(255,255,255,1)';
       ctx.fillRect(0, 0, view.w, view.h);
       ctx.restore();
     }
