@@ -1297,6 +1297,88 @@ let trailAcc = 0;
 // - boss_slam_warn / boss_slam (AoE warning + damage)
 
 let shieldFormationSeq = 1;
+let cavFormationSeq = 1;
+
+function spawnCavalryV(side) {
+  const margin = 110;
+  const wv = view.w, hv = view.h;
+  const px = player.x, py = player.y;
+
+  let sx = 0, sy = 0;
+  if (side === 0) { sx = px + rand(-wv / 2, wv / 2); sy = py - hv / 2 - margin; }
+  if (side === 1) { sx = px + wv / 2 + margin; sy = py + rand(-hv / 2, hv / 2); }
+  if (side === 2) { sx = px + rand(-wv / 2, wv / 2); sy = py + hv / 2 + margin; }
+  if (side === 3) { sx = px - wv / 2 - margin; sy = py + rand(-hv / 2, hv / 2); }
+
+  const fid = cavFormationSeq++;
+  const n = 15;            // V shape size (adjustable)
+  const spacing = 28;
+  const angle = Math.PI / 6; // 30° arms
+
+  const dx = px - sx, dy = py - sy;
+  const [nx, ny] = norm(dx, dy);
+  const pxp = -ny, pyp = nx;
+
+  // leader at tip of V
+  for (let i = 0; i < n; i++) {
+    let offF = 0;
+    let offS = 0;
+    if (i === 0) {
+      offF = 0; offS = 0;
+    } else {
+      const rank = ((i + 1) / 2) | 0; // 1,1,2,2,3,3...
+      const sideSign = (i % 2 === 1) ? -1 : 1;
+      offF = -rank * spacing * Math.cos(angle);
+      offS = sideSign * rank * spacing * Math.sin(angle);
+    }
+
+    const x = sx + nx * offF + pxp * offS;
+    const y = sy + ny * offF + pyp * offS;
+
+    const tier = Math.min(6, 1 + (state.elapsed / 55) | 0);
+    const r = 12 + tier * 1.3;
+    const hp = (22 + tier * 10) * 1.25;
+    const speed = (118 + tier * 12) * 1.15;
+
+    enemies.push({
+      x, y,
+      r,
+      hp,
+      speed,
+      big: false,
+      touchDmg: (14 + tier * 2) * 1.15,
+      vx: 0,
+      vy: 0,
+      frozenUntil: 0,
+      burnUntil: 0,
+      burnDps: 0,
+      bladeHitCd: 0,
+
+      type: 'cav',
+      elite: false,
+      dir: 0,
+      anim: rand(0, 10),
+      shootCd: 999,
+      shootBase: 999,
+      shootSpeed: 0,
+      shootDmg: 0,
+
+      formationId: fid,
+      formationIndex: i,
+      formationN: n,
+      isLeader: (i === 0),
+      cavAngle: angle,
+      cavSpacing: spacing,
+
+      // charge cadence
+      chargeCd: (i === 0) ? rand(1.6, 2.6) : rand(1.6, 2.6),
+      chargeT: 0,
+      chargeVx: 0,
+      chargeVy: 0,
+      slamCd: 0,
+    });
+  }
+}
 
 function spawnShieldWall(side) {
   const margin = 90;
@@ -1384,10 +1466,16 @@ function spawnEnemy() {
 
   const tier = Math.min(6, 1 + (state.elapsed / 55) | 0);
 
-  // shield wall formation (starts later)
+  // formations (start later)
   if (state.elapsed > 90 && enemies.length < 260) {
     const shieldChance = clamp(0.02 + (state.elapsed - 90) / 240 * 0.06, 0.02, 0.08);
-    if (Math.random() < shieldChance) {
+    const cavChance = clamp(0.01 + (state.elapsed - 120) / 240 * 0.05, 0.0, 0.06);
+    const roll = Math.random();
+    if (roll < cavChance) {
+      spawnCavalryV(side);
+      return;
+    }
+    if (roll < cavChance + shieldChance) {
       spawnShieldWall(side);
       return;
     }
@@ -2042,15 +2130,24 @@ function collideBullets() {
 function updateEnemies(dt) {
   const now = state.elapsed;
 
-  // Build shield-wall formations (leader + members)
+  // Build formations (leader + members)
   const shieldF = new Map();
+  const cavF = new Map();
   for (const e of enemies) {
-    if (e.type !== 'shield') continue;
-    const id = e.formationId || 0;
-    if (!shieldF.has(id)) shieldF.set(id, { leader: null, members: [] });
-    const f = shieldF.get(id);
-    f.members.push(e);
-    if (e.isLeader) f.leader = e;
+    if (e.type === 'shield') {
+      const id = e.formationId || 0;
+      if (!shieldF.has(id)) shieldF.set(id, { leader: null, members: [] });
+      const f = shieldF.get(id);
+      f.members.push(e);
+      if (e.isLeader) f.leader = e;
+    }
+    if (e.type === 'cav') {
+      const id = e.formationId || 0;
+      if (!cavF.has(id)) cavF.set(id, { leader: null, members: [] });
+      const f = cavF.get(id);
+      f.members.push(e);
+      if (e.isLeader) f.leader = e;
+    }
   }
 
   for (let i = enemies.length - 1; i >= 0; i--) {
@@ -2070,7 +2167,64 @@ function updateEnemies(dt) {
       const d = Math.hypot(dx, dy);
       const [nx, ny] = norm(dx, dy);
 
-      if (e.type === 'shield') {
+      if (e.type === 'cav') {
+        // --- Cavalry V formation: tidy V charge
+        const f = cavF.get(e.formationId || 0);
+        const leader = f?.leader || e;
+
+        // leader charge cadence
+        if (e === leader) {
+          e.chargeCd = Math.max(0, (e.chargeCd || 0) - dt);
+          if ((e.chargeT || 0) > 0) {
+            e.x += (e.chargeVx || 0) * dt;
+            e.y += (e.chargeVy || 0) * dt;
+            e.chargeT -= dt;
+          } else {
+            if (e.chargeCd <= 0) {
+              // short tell + burst
+              effects.push({ type: 'elite_tell', x: e.x, y: e.y, t: 0, ttl: 0.35, dx, dy });
+              const [cx, cy] = norm(dx, dy);
+              e.chargeVx = cx * 760;
+              e.chargeVy = cy * 760;
+              e.chargeT = 0.28;
+              e.chargeCd = rand(1.9, 3.0);
+            } else {
+              e.x += nx * e.speed * dt;
+              e.y += ny * e.speed * dt;
+            }
+          }
+        }
+
+        // formation slots behind leader
+        const dxL = player.x - leader.x;
+        const dyL = player.y - leader.y;
+        const [fnx, fny] = norm(dxL, dyL);
+        const pxp = -fny, pyp = fnx;
+        const angle = leader.cavAngle || (Math.PI / 6);
+        const spacing = leader.cavSpacing || 28;
+        const idx = e.formationIndex || 0;
+
+        let offF = 0, offS = 0;
+        if (idx === 0) {
+          offF = 0; offS = 0;
+        } else {
+          const rank = ((idx + 1) / 2) | 0;
+          const sideSign = (idx % 2 === 1) ? -1 : 1;
+          offF = -rank * spacing * Math.cos(angle);
+          offS = sideSign * rank * spacing * Math.sin(angle);
+        }
+        const tx = leader.x + fnx * offF + pxp * offS;
+        const ty = leader.y + fny * offF + pyp * offS;
+
+        const k = 10.5;
+        e.vx += (tx - e.x) * k * dt;
+        e.vy += (ty - e.y) * k * dt;
+        e.vx *= 0.76;
+        e.vy *= 0.76;
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+
+      } else if (e.type === 'shield') {
         // --- Shield wall formation: move as a tidy line
         const f = shieldF.get(e.formationId || 0);
         const leader = f?.leader || e;
@@ -3244,11 +3398,41 @@ function draw() {
     const f = frozen ? 0 : (Math.floor(e.anim * 8) % 4);
 
     const base = (e.type === 'ranger') ? SPR.skullRanger : SPR.skullMelee;
-    const scale = e.elite ? 5.0 : (e.big ? 2.0 : (e.type === 'shield' ? 1.15 : 1.0));
+    const scale = e.elite ? 5.0 : (e.big ? 2.0 : (e.type === 'shield' ? 1.15 : (e.type === 'cav' ? 1.05 : 1.0)));
     const alpha = frozen ? 0.75 : 1;
 
     // Elite visual: add a golden helmet overlay + glowing eyes
     drawSprite(base[e.dir][f], sx, sy, { scale, alpha });
+
+    // Cavalry overlay (lance + horse blocky silhouette)
+    if (e.type === 'cav' && !frozen) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.globalAlpha = 0.95;
+      ctx.translate(sx, sy);
+      const s = scale;
+      // horse body
+      ctx.fillStyle = 'rgba(110,80,60,.95)';
+      ctx.fillRect(-12 * s, -4 * s, 24 * s, 12 * s);
+      ctx.fillStyle = 'rgba(80,55,40,.95)';
+      ctx.fillRect(8 * s, -8 * s, 8 * s, 8 * s); // head
+      // rider
+      ctx.fillStyle = 'rgba(160,170,190,.95)';
+      ctx.fillRect(-2 * s, -14 * s, 8 * s, 10 * s);
+      // lance forward
+      let ox = 0, oy = 0;
+      if (e.dir === 0) { oy = 10 * s; }
+      if (e.dir === 3) { oy = -10 * s; }
+      if (e.dir === 2) { ox = 10 * s; }
+      if (e.dir === 1) { ox = -10 * s; }
+      ctx.strokeStyle = 'rgba(246,195,92,.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(2 * s, -6 * s);
+      ctx.lineTo(14 * s + ox, -6 * s + oy);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // Shield soldier overlay (front shield + hammer)
     if (e.type === 'shield' && !frozen) {
