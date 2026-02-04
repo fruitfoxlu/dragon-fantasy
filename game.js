@@ -2884,21 +2884,30 @@ function draw() {
       ctx.save();
       ctx.globalAlpha = 0.9;
 
+      // Big visible label
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.fillRect(10, 10, 130, 26);
+      ctx.fillStyle = 'rgba(255,255,255,.95)';
+      ctx.font = '14px ui-monospace, Menlo, monospace';
+      ctx.fillText('DEBUG ON', 18, 28);
+
       // red cross = screen center (where player should be)
-      ctx.strokeStyle = 'rgba(255,80,80,.95)';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255,80,80,.98)';
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(cx - 14, cy);
-      ctx.lineTo(cx + 14, cy);
-      ctx.moveTo(cx, cy - 14);
-      ctx.lineTo(cx, cy + 14);
+      ctx.moveTo(cx - 40, cy);
+      ctx.lineTo(cx + 40, cy);
+      ctx.moveTo(cx, cy - 40);
+      ctx.lineTo(cx, cy + 40);
       ctx.stroke();
 
       // cyan circle = computed player screen position
-      ctx.strokeStyle = 'rgba(80,200,255,.95)';
+      ctx.strokeStyle = 'rgba(80,200,255,.98)';
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(psx, psy, 10, 0, Math.PI * 2);
+      ctx.arc(psx, psy, 26, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.lineWidth = 1;
 
       ctx.fillStyle = 'rgba(0,0,0,.6)';
       ctx.fillRect(10, canvas.height - 44, 360, 34);
