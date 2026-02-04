@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v89';
+const BUILD = 'v90';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -3468,6 +3468,41 @@ function draw() {
         ctx.drawImage(img, sx + ox, sy + oy, tileSize, tileSize);
       }
     }
+  }
+
+  // Chest highlight: tint the 3x3 tiles around each chest so players notice it.
+  if (chests.length) {
+    const pulse = 0.35 + 0.25 * (0.5 + 0.5 * Math.sin(state.elapsed * 4.6));
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#ffe08a';
+    for (const c of chests) {
+      const cx = Math.floor(c.x / tileSize);
+      const cy = Math.floor(c.y / tileSize);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const tx = cx + dx;
+          const ty = cy + dy;
+          const sx = tx * tileSize - state.camera.x;
+          const sy = ty * tileSize - state.camera.y;
+          // only draw if roughly on screen
+          if (sx < -tileSize || sy < -tileSize || sx > view.w + tileSize || sy > view.h + tileSize) continue;
+          ctx.fillRect(sx, sy, tileSize, tileSize);
+        }
+      }
+    }
+    // thin border grid
+    ctx.globalAlpha = 0.22 + pulse * 0.18;
+    ctx.strokeStyle = '#ffd36a';
+    ctx.lineWidth = 2;
+    for (const c of chests) {
+      const cx = Math.floor(c.x / tileSize);
+      const cy = Math.floor(c.y / tileSize);
+      const sx0 = (cx - 1) * tileSize - state.camera.x;
+      const sy0 = (cy - 1) * tileSize - state.camera.y;
+      ctx.strokeRect(sx0 + 1, sy0 + 1, tileSize * 3 - 2, tileSize * 3 - 2);
+    }
+    ctx.restore();
   }
 
   // effects: burn fields (pixel ring)
