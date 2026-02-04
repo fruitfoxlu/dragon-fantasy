@@ -1296,6 +1296,79 @@ let trailAcc = 0;
 // - boss_tell / elite_tell (charge telegraph)
 // - boss_slam_warn / boss_slam (AoE warning + damage)
 
+let shieldFormationSeq = 1;
+
+function spawnShieldWall(side) {
+  const margin = 90;
+  const wv = view.w, hv = view.h;
+  const px = player.x, py = player.y;
+
+  // spawn line on one side of the screen, like spawnEnemy
+  let sx = 0, sy = 0;
+  if (side === 0) { sx = px + rand(-wv / 2, wv / 2); sy = py - hv / 2 - margin; }
+  if (side === 1) { sx = px + wv / 2 + margin; sy = py + rand(-hv / 2, hv / 2); }
+  if (side === 2) { sx = px + rand(-wv / 2, wv / 2); sy = py + hv / 2 + margin; }
+  if (side === 3) { sx = px - wv / 2 - margin; sy = py + rand(-hv / 2, hv / 2); }
+
+  const fid = shieldFormationSeq++;
+  const n = 20;
+  const spacing = 30;
+
+  const dx = px - sx, dy = py - sy;
+  const [nx, ny] = norm(dx, dy);
+  const pxp = -ny, pyp = nx;
+
+  // leader is center
+  const leaderIdx = (n / 2) | 0;
+
+  for (let i = 0; i < n; i++) {
+    const off = (i - (n - 1) / 2) * spacing;
+    const x = sx + pxp * off;
+    const y = sy + pyp * off;
+
+    // tougher than normal mobs; slower; hammer type
+    const tier = Math.min(6, 1 + (state.elapsed / 55) | 0);
+    let r = 13 + tier * 1.6;
+    let hp = (34 + tier * 14) * 1.6;
+    let speed = (62 + tier * 10) * 0.85;
+
+    enemies.push({
+      x, y,
+      r,
+      hp,
+      speed,
+      big: false,
+      touchDmg: (12 + tier * 2),
+      vx: 0,
+      vy: 0,
+      frozenUntil: 0,
+      burnUntil: 0,
+      burnDps: 0,
+      bladeHitCd: 0,
+
+      type: 'shield',
+      elite: false,
+      dir: 0,
+      anim: rand(0, 10),
+      shootCd: 999,
+      shootBase: 999,
+      shootSpeed: 0,
+      shootDmg: 0,
+
+      formationId: fid,
+      formationIndex: i,
+      formationN: n,
+      isLeader: (i === leaderIdx),
+
+      chargeCd: 0,
+      chargeT: 0,
+      chargeVx: 0,
+      chargeVy: 0,
+      slamCd: 0,
+    });
+  }
+}
+
 function spawnEnemy() {
 
   const margin = 80;
@@ -1310,6 +1383,15 @@ function spawnEnemy() {
   if (side === 3) { sx = px - w / 2 - margin; sy = py + rand(-h / 2, h / 2); }
 
   const tier = Math.min(6, 1 + (state.elapsed / 55) | 0);
+
+  // shield wall formation (starts later)
+  if (state.elapsed > 90 && enemies.length < 260) {
+    const shieldChance = clamp(0.02 + (state.elapsed - 90) / 240 * 0.06, 0.02, 0.08);
+    if (Math.random() < shieldChance) {
+      spawnShieldWall(side);
+      return;
+    }
+  }
 
   // enemy mix
   const rangerChance = clamp(0.12 + state.elapsed / 260 * 0.05, 0.12, 0.22);
@@ -1534,8 +1616,16 @@ function killEnemyAt(index) {
   enemies.splice(index, 1);
 }
 
-function damageEnemy(e, amount) {
-  e.hp -= amount;
+function damageEnemy(e, amount, srcx=null, srcy=null) {
+  let dmg = amount;
+  if (e.type === 'shield' && srcx != null && srcy != null) {
+    // frontal damage reduction: if hit comes from the direction the shield faces (toward player)
+    const [ax, ay] = norm(e.x - srcx, e.y - srcy);       // attacker->enemy direction
+    const [fx, fy] = norm(player.x - e.x, player.y - e.y); // enemy faces player
+    const dot = ax * fx + ay * fy;
+    if (dot > 0.25) dmg *= 0.6;
+  }
+  e.hp -= dmg;
 }
 
 function dirFromVec(dx, dy) {
@@ -1663,7 +1753,7 @@ function updateWhirlingBlades(dt) {
       const d = dist(bx, by, e.x, e.y);
       if (d < w.bladeR + e.r) {
         if (e.bladeHitCd <= 0) {
-          damageEnemy(e, w.damage);
+          damageEnemy(e, w.damage, player.x, player.y);
           e.bladeHitCd = w.tick;
           // tiny knockback
           const [nx, ny] = norm(e.x - player.x, e.y - player.y);
@@ -1726,7 +1816,7 @@ function updateChainLightning(dt) {
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
       if (!chain.includes(e)) continue;
-      damageEnemy(e, w.damage);
+      damageEnemy(e, w.damage, player.x, player.y);
       const [nx, ny] = norm(e.x - player.x, e.y - player.y);
       e.vx += nx * 60;
       e.vy += ny * 60;
@@ -1779,7 +1869,7 @@ function applyMeteorImpact(x, y) {
     const e = enemies[i];
     const d = dist(x, y, e.x, e.y);
     if (d <= w.impactRadius + e.r) {
-      damageEnemy(e, w.impactDamage);
+      damageEnemy(e, w.impactDamage, fx.x, fx.y);
       // knockback outward
       const [nx, ny] = norm(e.x - x, e.y - y);
       e.vx += nx * 220;
@@ -1873,7 +1963,7 @@ function updateDragonSoul(dt) {
       const d = dist(cx, cy, e.x, e.y);
       if (d < (w.crossSize * 0.9) + e.r) {
         if ((e.dragonHitCd || 0) <= 0) {
-          damageEnemy(e, w.damage);
+          damageEnemy(e, w.damage, player.x, player.y);
           e.dragonHitCd = w.tick;
           // knockback
           const [nx, ny] = norm(e.x - player.x, e.y - player.y);
@@ -1932,7 +2022,7 @@ function collideBullets() {
       const e = enemies[ei];
       const d = dist(e.x, e.y, b.x, b.y);
       if (d < e.r + b.r) {
-        damageEnemy(e, b.dmg);
+        damageEnemy(e, b.dmg, player.x, player.y);
 
         if (e.hp <= 0) {
           killEnemyAt(ei);
@@ -1952,6 +2042,17 @@ function collideBullets() {
 function updateEnemies(dt) {
   const now = state.elapsed;
 
+  // Build shield-wall formations (leader + members)
+  const shieldF = new Map();
+  for (const e of enemies) {
+    if (e.type !== 'shield') continue;
+    const id = e.formationId || 0;
+    if (!shieldF.has(id)) shieldF.set(id, { leader: null, members: [] });
+    const f = shieldF.get(id);
+    f.members.push(e);
+    if (e.isLeader) f.leader = e;
+  }
+
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
 
@@ -1969,7 +2070,44 @@ function updateEnemies(dt) {
       const d = Math.hypot(dx, dy);
       const [nx, ny] = norm(dx, dy);
 
-      if (e.type === 'boss') {
+      if (e.type === 'shield') {
+        // --- Shield wall formation: move as a tidy line
+        const f = shieldF.get(e.formationId || 0);
+        const leader = f?.leader || e;
+
+        // leader advances toward player
+        if (e === leader) {
+          e.x += nx * e.speed * dt;
+          e.y += ny * e.speed * dt;
+        }
+
+        // lineup axis is perpendicular to facing direction
+        const pxp = -ny, pyp = nx;
+        const n = leader.formationN || 20;
+        const idx = e.formationIndex || 0;
+        const spacing = 30;
+        const off = (idx - (n - 1) / 2) * spacing;
+        const tx = leader.x + pxp * off;
+        const ty = leader.y + pyp * off;
+
+        // strong correction to keep the line tight
+        const k = 8.5;
+        e.vx += (tx - e.x) * k * dt;
+        e.vy += (ty - e.y) * k * dt;
+
+        // damp + apply
+        e.vx *= 0.78;
+        e.vy *= 0.78;
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+
+        // hammer soldiers: small forward shove so the line doesn't lag
+        if (e !== leader) {
+          e.x += nx * e.speed * dt * 0.20;
+          e.y += ny * e.speed * dt * 0.20;
+        }
+
+      } else if (e.type === 'boss') {
         // --- Big Boss AI (no bullets): charge / slam / summon
         e.chargeCd = Math.max(0, e.chargeCd - dt);
         e.slamCd = Math.max(0, e.slamCd - dt);
@@ -2287,7 +2425,7 @@ function updateEffects(dt) {
         if (d >= r - band && d <= r + band) {
           if (!e._waveHitAt || now - e._waveHitAt > 0.5) {
             e._waveHitAt = now;
-            damageEnemy(e, w.damage);
+            damageEnemy(e, w.damage, player.x, player.y);
             const [nx, ny] = norm(e.x - fx.x, e.y - fx.y);
             e.vx += nx * w.knock;
             e.vy += ny * w.knock;
@@ -3106,11 +3244,43 @@ function draw() {
     const f = frozen ? 0 : (Math.floor(e.anim * 8) % 4);
 
     const base = (e.type === 'ranger') ? SPR.skullRanger : SPR.skullMelee;
-    const scale = e.elite ? 5.0 : (e.big ? 2.0 : 1.0);
+    const scale = e.elite ? 5.0 : (e.big ? 2.0 : (e.type === 'shield' ? 1.15 : 1.0));
     const alpha = frozen ? 0.75 : 1;
 
     // Elite visual: add a golden helmet overlay + glowing eyes
     drawSprite(base[e.dir][f], sx, sy, { scale, alpha });
+
+    // Shield soldier overlay (front shield + hammer)
+    if (e.type === 'shield' && !frozen) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.globalAlpha = 0.95;
+      ctx.translate(sx, sy);
+      const s = scale;
+      // directional offsets
+      let ox = 0, oy = 0;
+      if (e.dir === 0) { oy = 10 * s; }
+      if (e.dir === 3) { oy = -10 * s; }
+      if (e.dir === 2) { ox = 10 * s; }
+      if (e.dir === 1) { ox = -10 * s; }
+
+      // shield
+      ctx.fillStyle = 'rgba(160,170,190,.95)';
+      ctx.fillRect(-10 * s + ox, -8 * s + oy, 20 * s, 16 * s);
+      ctx.strokeStyle = 'rgba(0,0,0,.35)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-10 * s + ox, -8 * s + oy, 20 * s, 16 * s);
+      ctx.fillStyle = 'rgba(246,195,92,.75)';
+      ctx.fillRect(-2 * s + ox, -2 * s + oy, 4 * s, 4 * s);
+
+      // hammer (C)
+      ctx.fillStyle = 'rgba(90,70,50,.95)';
+      ctx.fillRect(6 * s, -2 * s, 2 * s, 16 * s);
+      ctx.fillStyle = 'rgba(120,120,130,.95)';
+      ctx.fillRect(2 * s, -6 * s, 12 * s, 6 * s);
+      ctx.fillRect(4 * s, -8 * s, 8 * s, 2 * s);
+      ctx.restore();
+    }
 
     // Big brute visual: red tint overlay (easy to distinguish)
     if (e.big && !frozen) {
