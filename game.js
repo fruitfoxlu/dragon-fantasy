@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v88';
+const BUILD = 'v89';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -82,6 +82,7 @@ const ui = {
   hudWeapons: document.getElementById('hudWeapons'),
   hudMagic: document.getElementById('hudMagic'),
   hudChestHint: document.getElementById('hudChestHint'),
+  hudPassives: document.getElementById('hudPassives'),
 };
 
 // ---------- helpers
@@ -1110,6 +1111,8 @@ const state = {
 const player = {
   x: 0,
   y: 0,
+  passives: { hp: 0, speed: 0, magnet: 0 }, // display-only levels
+
   r: 14,
   hp: 100,
   hpMax: 100,
@@ -3059,7 +3062,7 @@ const UPGRADE_POOL = [
     id: 'hp',
     title: '體魄：最大 HP +20',
     desc: '更耐打，容錯更高。',
-    apply() { player.hpMax += 20; player.hp += 20; }
+    apply() { player.hpMax += 20; player.hp += 20; player.passives.hp = (player.passives.hp || 0) + 1; }
   },
   {
     id: 'hp_pct',
@@ -3069,19 +3072,20 @@ const UPGRADE_POOL = [
       const before = player.hpMax;
       player.hpMax = Math.ceil(player.hpMax * 1.10);
       player.hp += (player.hpMax - before);
+      player.passives.hp = (player.passives.hp || 0) + 1;
     }
   },
   {
     id: 'speed',
     title: '敏捷：移動速度 +10%',
     desc: '更容易走位與風箏。',
-    apply() { player.speed *= 1.10; }
+    apply() { player.speed *= 1.10; player.passives.speed = (player.passives.speed || 0) + 1; }
   },
   {
     id: 'magnet',
     title: '龍之召喚：拾取範圍 +25',
     desc: '更容易吸到經驗之魂。',
-    apply() { player.magnet += 25; }
+    apply() { player.magnet += 25; player.passives.magnet = (player.passives.magnet || 0) + 1; }
   },
 ];
 
@@ -4065,6 +4069,17 @@ function updateUI() {
       const lvl = weapons[k].lvl || 0;
       return `<div class="hudItem"><span class="n">${weaponLabel(k)}</span><span class="l">Lv.${lvl}</span></div>`;
     }).join('') || `<div class="hudLine">(none)</div>`;
+  }
+
+  if (ui.hudPassives) {
+    const p = player.passives || {};
+    const items = [];
+    if (p.hp) items.push({ n: (lang === 'zh') ? '體魄' : 'Vitality', l: p.hp });
+    if (p.speed) items.push({ n: (lang === 'zh') ? '敏捷' : 'Agility', l: p.speed });
+    if (p.magnet) items.push({ n: (lang === 'zh') ? '龍之召喚' : 'Dragon Call', l: p.magnet });
+    ui.hudPassives.innerHTML = items.map(it => (
+      `<div class="hudItem"><span class="n">${it.n}</span><span class="l">Lv.${it.l}</span></div>`
+    )).join('') || `<div class="hudLine">(none)</div>`;
   }
 
   // hint: chest count (so players remember to pick them up)
