@@ -1113,7 +1113,7 @@ const state = {
 
   nextBossAt: 300,
 
-  doomCharges: 3,
+  doomShards: 0, // collect 3 shards to cast once
 
   // level-up pacing (strict: one reward per level)
   awardQueue: [],          // [levelNumber]
@@ -1661,7 +1661,7 @@ function killEnemyAt(index) {
     }
     // Boss: guaranteed vacuum gem
     vacuumGems.push({ x: e.x, y: e.y, r: 14 });
-    // Boss drop: doom orb (adds +1 doom charge, unlimited stacking)
+    // Boss drop: doom shard (+1). Collect 3 shards to cast Doom.
     doomOrbs.push({ x: e.x + rand(-16, 16), y: e.y + rand(-16, 16), r: 12 });
   } else if (e.elite) {
     // Elite: guaranteed chest + extra chance.
@@ -2045,15 +2045,14 @@ function updateDragonSoul(dt) {
 
 function doomStrike(free=false) {
   if (state.mode !== 'play' || paused) return;
+
   if (!free) {
-    if (state.doomCharges <= 0) return;
-    state.doomCharges -= 1;
+    if ((state.doomShards || 0) < 3) return;
+    state.doomShards -= 3;
   }
 
   sfxDoom();
-  toast.text = (lang === 'zh')
-    ? `毀天滅地！(${state.doomCharges})`
-    : `DOOM! (${state.doomCharges})`;
+  toast.text = (lang === 'zh') ? '毀天滅地！' : 'DOOM!';
   toast.t = 1.4;
 
   // screen effect
@@ -2447,9 +2446,10 @@ function updateDoomOrbs(dt) {
     const d = dist(player.x, player.y, o.x, o.y);
     if (d < player.r + o.r) {
       doomOrbs.splice(i, 1);
-      state.doomCharges += 1; // no cap
+      state.doomShards = (state.doomShards || 0) + 1;
       sfxPickup('reward');
-      toast.text = (lang === 'zh') ? `毀天滅地 +1（${state.doomCharges}）` : `Doom +1 (${state.doomCharges})`;
+      const c = state.doomShards % 3;
+      toast.text = (lang === 'zh') ? `毀天碎片 +1（${c}/3）` : `Doom Shard +1 (${c}/3)`;
       toast.t = 2.0;
       return;
     }
@@ -2707,9 +2707,9 @@ const CHEST_POOL = [
   },
   {
     id: 'chest_doom',
-    title: { zh: '毀天滅地：全圖敵人消滅', en: 'Doom: Erase All Enemies' },
-    desc: { zh: '立刻清空地圖上所有敵人。', en: 'Instantly wipe all enemies on the field.' },
-    apply() { doomStrike(true); }
+    title: { zh: '毀天碎片：+1（集滿 3 次施放）', en: 'Doom Shard: +1 (3 to cast)' },
+    desc: { zh: '收集 3 個碎片才能施放一次毀天滅地。', en: 'Collect 3 shards to cast Doom once.' },
+    apply() { state.doomShards = (state.doomShards || 0) + 1; sfxPickup('reward'); }
   },
 ];
 
@@ -3811,8 +3811,14 @@ function updateUI() {
   // right HUD
   if (ui.hudSlots) ui.hudSlots.textContent = `Slots: ${weaponEnabledCount()}/${player.weaponSlots} (Max ${player.weaponSlotsMax})`;
 
-  if (ui.doomBtn) ui.doomBtn.textContent = `Doom: ${state.doomCharges}`;
-  if (ui.doomTouchBtn) ui.doomTouchBtn.textContent = `Doom: ${state.doomCharges}`;
+  if (ui.doomBtn || ui.doomTouchBtn) {
+    const shards = (state.doomShards || 0);
+    const ready = Math.floor(shards / 3);
+    const rem = shards % 3;
+    const label = (ready > 0) ? `Doom: ${ready} (${rem}/3)` : `Doom: ${rem}/3`;
+    if (ui.doomBtn) ui.doomBtn.textContent = label;
+    if (ui.doomTouchBtn) ui.doomTouchBtn.textContent = label;
+  }
 
   if (ui.awardLine) {
     if (state.currentAwardLevel != null) {
@@ -3965,7 +3971,7 @@ function resetRun() {
   state.elapsed = 0;
   state.kills = 0;
   state.nextBossAt = 300;
-  state.doomCharges = 3;
+  state.doomShards = 0;
   state.awardQueue = [];
   state.awardedLevels = {};
   state.currentAwardLevel = null;
