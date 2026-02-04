@@ -18,6 +18,8 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+const IS_COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
 const ui = {
   hp: document.getElementById('hp'),
   level: document.getElementById('level'),
@@ -944,6 +946,7 @@ const joy = {
 };
 
 function setJoy(dx, dy) {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
   joy.dx = clamp(dx, -1, 1);
   joy.dy = clamp(dy, -1, 1);
   if (ui.joyKnob) {
@@ -2708,7 +2711,14 @@ function draw() {
     const [sx, sy] = worldToScreen(player.x, player.y);
     const alpha = player.invuln > 0 ? 0.8 : 1;
     const f = player.moving ? (Math.floor(player.anim * 10) % 4) : 0;
-    drawSprite(SPR.hero[player.dir][f], sx, sy, { scale: 1, alpha });
+    const pScale = IS_COARSE ? 1.35 : 1;
+    // shadow ring so hero never blends into grass on mobile
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.beginPath();
+    ctx.arc(sx, sy + 10 * pScale, 13 * pScale, 0, Math.PI * 2);
+    ctx.fill();
+
+    drawSprite(SPR.hero[player.dir][f], sx, sy, { scale: pScale, alpha });
 
     // HP bar above hero (make it very visible)
     const hp01 = clamp(player.hp / player.hpMax, 0, 1);
@@ -2910,6 +2920,15 @@ function loop(now) {
     toast.t = Math.max(0, toast.t - dt);
 
     updatePlayer(dt);
+
+    // safety: avoid NaN positions on some in-app browsers
+    if (!Number.isFinite(player.x) || !Number.isFinite(player.y)) {
+      player.x = 16;
+      player.y = 16;
+      player.vx = 0;
+      player.vy = 0;
+      resetJoy();
+    }
 
     // spawn pacing ramps up
     enemySpawnAcc += dt;
