@@ -41,6 +41,7 @@ body{
 .titleRow{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:6px; flex-wrap:wrap}
 .title{font-weight:800; letter-spacing:.3px; font-size:18px; color:var(--accent)}
 .subtitle{color:var(--muted); font-size:12px}
+.build{color:rgba(243,241,231,.55); font-size:11px; font-weight:900; letter-spacing:.3px}
 .row{display:flex; gap:14px; justify-content:space-between; flex-wrap:wrap}
 .small{color:var(--muted); font-size:12px}
 

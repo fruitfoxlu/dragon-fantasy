@@ -20,6 +20,7 @@ const ctx = canvas.getContext('2d');
 
 const IS_COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 const DEBUG = new URLSearchParams(location.search).has('debug');
+const BUILD = 'v14';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -166,9 +167,8 @@ function applyStaticI18n() {
   };
 
   setText('subtitle', t('subtitle'));
-  setText('hintMove', t('hintMove'));
-  setText('hintAim', t('hintAim'));
-  setText('hintPause', t('hintPause'));
+  setText('build', BUILD);
+  // control hints removed from top HUD
   setText('startSub', t('startSub'));
   set('liMove', t('liMove'));
   set('liWand', t('liWand'));
