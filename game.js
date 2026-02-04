@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v70';
+const BUILD = 'v71';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1475,7 +1475,7 @@ function spawnEnemy() {
 
   // enemy mix
   const rangerChance = clamp(0.12 + state.elapsed / 260 * 0.05, 0.12, 0.22);
-  const eliteChance = clamp(0.02 + state.elapsed / 420 * 0.03, 0.02, 0.08);
+  const eliteChance = (state.elapsed < 60) ? 0 : clamp(0.02 + (state.elapsed - 60) / 420 * 0.03, 0.02, 0.08);
   const ninjaChance = (state.elapsed < 180) ? 0 : clamp(0.03 + (state.elapsed - 180) / 240 * 0.05, 0.03, 0.10);
 
   let type = 'melee';
@@ -4008,9 +4008,9 @@ function loop(now) {
       if (Math.random() < 0.30) spawnEnemy();
     }
 
-    // Boss spawn
+    // Boss spawn (strict time gate)
     const bossAlive = enemies.some(e => e.type === 'boss');
-    if (!bossAlive && state.elapsed >= state.nextBossAt) {
+    if (state.elapsed >= 60 && !bossAlive && state.elapsed >= state.nextBossAt) {
       spawnBoss();
       state.nextBossAt += 300;
     }
