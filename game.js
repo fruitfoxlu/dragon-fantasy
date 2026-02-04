@@ -66,7 +66,7 @@ const ui = {
   kills: document.getElementById('kills'),
   time: document.getElementById('time'),
   hpFill: document.getElementById('hpFill'),
-  musicBtn: document.getElementById('musicBtn'),
+  sfxBtn: document.getElementById('sfxBtn'),
   langBtn: document.getElementById('langBtn'),
   start: document.getElementById('start'),
   startBtn: document.getElementById('startBtn'),
@@ -96,15 +96,13 @@ const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 let audio = {
   ctx: null,
   master: null,
-  musicOn: false,
-  timer: null,
-  t0: 0,
+  sfxOn: true,
 };
 
 // ---------- i18n
 const I18N = {
   en: {
-    music: (on) => `Music: ${on ? 'ON' : 'OFF'}`,
+    sfx: (on) => `SFX: ${on ? 'ON' : 'OFF'}`, 
     levelUpTitle: 'Level Up! Choose 1',
     chestTitle: 'Treasure! Choose 1',
     replaceTitle: 'Weapon Slots Full — Replace One',
@@ -136,7 +134,7 @@ const I18N = {
     w_dragon: 'Dragon Soul',
   },
   zh: {
-    music: (on) => `音樂：${on ? '開' : '關'}`,
+    sfx: (on) => `音效：${on ? '開' : '關'}`, 
     levelUpTitle: '升級！選 1 個',
     chestTitle: '寶箱！選 1 個',
     replaceTitle: '武器槽已滿：請替換一把',
@@ -219,12 +217,12 @@ function setLang(next) {
   }
 
   applyStaticI18n();
-  setMusicLabel();
+  setSfxLabel();
 }
 
-function setMusicLabel() {
-  if (!ui.musicBtn) return;
-  ui.musicBtn.textContent = t('music', audio.musicOn);
+function setSfxLabel() {
+  if (!ui.sfxBtn) return;
+  ui.sfxBtn.textContent = t('sfx', audio.sfxOn);
 }
 
 function ensureAudio() {
@@ -237,11 +235,12 @@ function ensureAudio() {
 }
 
 function sfxPickup(type) {
+  if (!audio.sfxOn) return;
   // Subtle, pleasant 32-bit style chime (varied so it won't get annoying)
   try {
     ensureAudio();
     const t = audio.ctx.currentTime;
-    const base = type === 'chest' ? 740 : 620;
+    const base = type === 'reward' ? 820 : (type === 'chest' ? 740 : 620);
     const det = 1 + (Math.random() * 0.018 - 0.009);
     const f1 = base * det;
     const f2 = base * 1.2599 * det; // minor third
@@ -268,141 +267,25 @@ function sfxPickup(type) {
 
     // tiny click for chests
     if (type === 'chest') mk(base * 2, t + 0.02, 0.04, 0.03, 'square');
+
+    // extra sparkle for "reward" (e.g. chest drop)
+    if (type === 'reward') {
+      mk(base * 2.52, t + 0.14, 0.08, 0.035, 'triangle');
+      mk(base * 3.0, t + 0.18, 0.10, 0.028, 'sine');
+    }
   } catch {}
 }
 
-function stopMusic() {
-  if (!audio.ctx) return;
-  if (audio.timer) {
-    clearInterval(audio.timer);
-    audio.timer = null;
-  }
-}
+// music removed (SFX only)
 
 function startMusic() {
-  ensureAudio();
-  if (audio.ctx.state === 'suspended') audio.ctx.resume();
-  stopMusic();
-
-  // simple sequencer (positive / adventurous): I–V–vi–IV in G major
-  const bpm = 112;
-  const stepSec = 60 / bpm / 2; // 8th notes
-  const scale = {
-    G: 196.0,
-    A: 220.0,
-    B: 246.94,
-    C: 261.63,
-    D: 293.66,
-    E: 329.63,
-    Fsh: 369.99,
-  };
-  const chords = [
-    ['G', 'B', 'D'],
-    ['D', 'Fsh', 'A'],
-    ['E', 'G', 'B'],
-    ['C', 'E', 'G'],
-  ];
-
-  // melody pattern (8 steps) indexes into chord tones + passing notes
-  const melody = [0, 1, 2, 1, 0, 1, 2, 3];
-  const passing = ['A', 'B', 'C', 'D', 'E'];
-
-  function playTone(freq, when, dur, type, gain) {
-    const osc = audio.ctx.createOscillator();
-    const g = audio.ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, when);
-
-    g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(gain, when + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-
-    osc.connect(g);
-    g.connect(audio.master);
-    osc.start(when);
-    osc.stop(when + dur + 0.02);
-  }
-
-  function kick(when) {
-    // tiny kick
-    const o = audio.ctx.createOscillator();
-    const g = audio.ctx.createGain();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(120, when);
-    o.frequency.exponentialRampToValueAtTime(45, when + 0.08);
-    g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(0.20, when + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.10);
-    o.connect(g);
-    g.connect(audio.master);
-    o.start(when);
-    o.stop(when + 0.12);
-  }
-
-  function hat(when) {
-    // noise hat
-    const buf = audio.ctx.createBuffer(1, 4410, 44100);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.35;
-    const src = audio.ctx.createBufferSource();
-    src.buffer = buf;
-    const g = audio.ctx.createGain();
-    g.gain.setValueAtTime(0.06, when);
-    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.03);
-    src.connect(g);
-    g.connect(audio.master);
-    src.start(when);
-    src.stop(when + 0.035);
-  }
-
-  const base = audio.ctx.currentTime + 0.05;
-  audio.t0 = base;
-
-  let step = 0;
-  audio.timer = setInterval(() => {
-    if (!audio.musicOn) return;
-    const t = audio.ctx.currentTime;
-    const lookahead = 0.18;
-
-    while (audio.t0 < t + lookahead) {
-      const chordIndex = Math.floor(step / 8) % chords.length;
-      const chord = chords[chordIndex];
-      const sInBar = step % 8;
-
-      // bass on beats
-      if (sInBar % 2 === 0) {
-        const root = chord[0];
-        playTone(scale[root] / 2, audio.t0, stepSec * 0.95, 'triangle', 0.10);
-      }
-
-      // pad-ish arpeggio
-      const arpNote = chord[sInBar % 3];
-      playTone(scale[arpNote], audio.t0, stepSec * 0.9, 'sawtooth', 0.035);
-
-      // melody (every other step)
-      if (sInBar % 2 === 0) {
-        let m = melody[sInBar];
-        let note;
-        if (m <= 2) note = chord[m];
-        else note = passing[(step + chordIndex) % passing.length];
-        playTone(scale[note] * 2, audio.t0, stepSec * 0.8, 'square', 0.02);
-      }
-
-      // light drums
-      if (sInBar === 0 || sInBar === 4) kick(audio.t0);
-      hat(audio.t0);
-
-      audio.t0 += stepSec;
-      step += 1;
-    }
-  }, 50);
+  // music removed
 }
 
-function toggleMusic(on) {
-  audio.musicOn = (on !== undefined) ? !!on : !audio.musicOn;
-  setMusicLabel();
-  if (audio.musicOn) startMusic();
-  else stopMusic();
+
+function toggleSfx(on) {
+  audio.sfxOn = (on !== undefined) ? !!on : !audio.sfxOn;
+  setSfxLabel();
 }
 
 function formatTime(s) {
@@ -1061,11 +944,19 @@ ui.pauseBtn?.addEventListener('click', () => {
   if (!paused) requestAnimationFrame(loop);
 });
 
-ui.musicBtn?.addEventListener('click', () => {
-  toggleMusic();
-});
 ui.langBtn?.addEventListener('click', () => {
   setLang(lang === 'zh' ? 'en' : 'zh');
+});
+
+// SFX toggle (default ON)
+try {
+  const saved = localStorage.getItem('df_sfx');
+  if (saved !== null) audio.sfxOn = saved === '1';
+} catch {}
+setSfxLabel();
+ui.sfxBtn?.addEventListener('click', () => {
+  toggleSfx();
+  try { localStorage.setItem('df_sfx', audio.sfxOn ? '1' : '0'); } catch {}
 });
 
 // init language (deferred until after state init to avoid ReferenceError)
@@ -1425,6 +1316,7 @@ function killEnemyAt(index) {
   // loot
   if (e.type === 'boss') {
     // Big Boss always drops big rewards.
+    sfxPickup('reward');
     for (let k = 0; k < 3; k++) {
       chests.push({ x: e.x + rand(-22, 22), y: e.y + rand(-22, 22), r: 12 });
     }
@@ -1435,6 +1327,7 @@ function killEnemyAt(index) {
     vacuumGems.push({ x: e.x, y: e.y, r: 14 });
   } else if (e.elite) {
     // Elite: guaranteed chest + extra chance.
+    sfxPickup('reward');
     chests.push({ x: e.x, y: e.y, r: 12 });
     if (Math.random() < 0.35) chests.push({ x: e.x + rand(-14, 14), y: e.y + rand(-14, 14), r: 12 });
 
@@ -3313,9 +3206,8 @@ function startGame() {
   if (state.mode !== 'start') return;
   ui.start.style.display = 'none';
 
-  // Audio autoplay policy: start only on user gesture.
-  // Default OFF.
-  toggleMusic(false);
+  // SFX default ON (no background music)
+  toggleSfx(true);
 
   resetRun();
   state.t0 = performance.now();
