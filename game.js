@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v82';
+const BUILD = 'v84';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1198,6 +1198,8 @@ const weapons = {
     spread: 0.03,
     speed: 620,
     pierce: 1,
+    bulletR: 6,        // thicker arrow
+    ricochetMax: 8,    // cap
   },
 
   holy: {
@@ -1291,7 +1293,8 @@ const weapons = {
 
 const bullets = [];       // player bullets {x,y,vx,vy,r, dmg, pierce, life, color}
 const enemyBullets = [];  // enemy bullets  {x,y,vx,vy,r, dmg, life}
-const enemies = [];       // {x,y,r, hp, speed, touchDmg, vx,vy, frozenUntil, burnUntil, burnDps, bladeHitCd, type, elite, shootCd, shootBase, shootSpeed, shootDmg}
+let enemyIdSeq = 1;
+const enemies = [];       // {id,x,y,r, hp, speed, touchDmg, vx,vy, frozenUntil, burnUntil, burnDps, bladeHitCd, type, elite, shootCd, shootBase, shootSpeed, shootDmg}
 const gems = [];          // {x,y,r, xp}
 const chests = [];        // {x,y,r}
 
@@ -1367,6 +1370,7 @@ function spawnCavalryV(side) {
     const speed = (118 + tier * 12) * 1.15;
 
     enemies.push({
+      id: enemyIdSeq++,
       x, y,
       r,
       hp,
@@ -1441,6 +1445,7 @@ function spawnShieldWall(side) {
     let speed = (62 + tier * 10) * 0.85;
 
     enemies.push({
+      id: enemyIdSeq++,
       x, y,
       r,
       hp,
@@ -1562,6 +1567,7 @@ function spawnEnemy() {
   }
 
   enemies.push({
+    id: enemyIdSeq++,
     x: sx,
     y: sy,
     r,
@@ -1619,6 +1625,7 @@ function spawnBoss() {
   const bossHpBase = (1200 + state.elapsed * 3.2) * 5;
 
   const boss = {
+    id: enemyIdSeq++,
     x: sx,
     y: sy,
     r: mega ? 88 : 44, // 2x size
@@ -1654,16 +1661,26 @@ function spawnBoss() {
 
 function fireBullet(fromX, fromY, dirX, dirY, spec) {
   const [nx, ny] = norm(dirX, dirY);
+  const r = spec.bulletR || 4;
+
+  // Bow ricochet unlocks with level (Lv5→2, Lv6→4, Lv7→6, Lv8+→8)
+  let ric = 0;
+  if (spec.kind === 'forward') {
+    ric = Math.max(0, Math.min(spec.ricochetMax || 0, Math.max(0, (spec.lvl || 0) - 4) * 2));
+  }
+
   bullets.push({
     x: fromX,
     y: fromY,
     vx: nx * spec.speed,
     vy: ny * spec.speed,
-    r: 4,
+    r,
     dmg: spec.damage,
     pierce: spec.pierce,
     life: 1.6,
     color: spec.kind === 'forward' ? '#f6c35c' : '#7cf2d0',
+    ricochetLeft: ric,
+    lastHitId: null,
   });
 }
 
@@ -1816,8 +1833,10 @@ function updateProjectileWeapons(dt) {
     if (w.cd > 0) continue;
 
     if (w.kind === 'cardinal') {
-      // Holy Water: fire in 4 directions
-      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+      // Holy Water: fire in 4 directions; at Lv8+ fire in 8 directions
+      const dirs4 = [[1,0],[-1,0],[0,1],[0,-1]];
+      const dirs8 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+      const dirs = (w.lvl >= 8) ? dirs8 : dirs4;
       for (const [dx, dy] of dirs) {
         fireBullet(player.x, player.y, dx, dy, w);
       }
@@ -1844,6 +1863,11 @@ function updateProjectileWeapons(dt) {
       const jitter = rand(-w.spread, w.spread) * 0.35;
       const ang = baseAng + spread + jitter;
       fireBullet(player.x, player.y, Math.cos(ang), Math.sin(ang), w);
+    }
+
+    // wand firing can ramp very fast, but clamp for performance
+    if (w === weapons.wand) {
+      w.baseCooldown = Math.max(0.08, w.baseCooldown);
     }
 
     w.cd = w.baseCooldown;
@@ -2150,17 +2174,50 @@ function collideBullets() {
       const e = enemies[ei];
       const d = dist(e.x, e.y, b.x, b.y);
       if (d < e.r + b.r) {
+        // avoid instantly hitting the same target after ricochet
+        if (b.lastHitId != null && e.id === b.lastHitId) continue;
+
         damageEnemy(e, b.dmg, player.x, player.y);
 
         if (e.hp <= 0) {
           killEnemyAt(ei);
         }
 
-        if (b.pierce > 0) {
-          b.pierce -= 1;
+        // Bow ricochet: bounce to another enemy up to N times
+        if ((b.ricochetLeft || 0) > 0) {
+          // find next target near current hit
+          let best = null;
+          let bestD = Infinity;
+          const range = 320;
+          for (const t of enemies) {
+            if (!t) continue;
+            if (t.id === e.id) continue;
+            if (b.lastHitId != null && t.id === b.lastHitId) continue;
+            const dd = dist(e.x, e.y, t.x, t.y);
+            if (dd <= range && dd < bestD) { bestD = dd; best = t; }
+          }
+
+          b.ricochetLeft -= 1;
+          b.lastHitId = e.id;
+
+          if (best) {
+            const [nx, ny] = norm(best.x - e.x, best.y - e.y);
+            b.vx = nx * (Math.hypot(b.vx, b.vy) || 620);
+            b.vy = ny * (Math.hypot(b.vx, b.vy) || 620);
+            // keep bullet alive
+          } else {
+            // no target: consume as normal
+            if (b.pierce > 0) b.pierce -= 1; else bullets.splice(bi, 1);
+          }
+
         } else {
-          bullets.splice(bi, 1);
+          if (b.pierce > 0) {
+            b.pierce -= 1;
+          } else {
+            bullets.splice(bi, 1);
+          }
         }
+
         break;
       }
     }
