@@ -2529,9 +2529,19 @@ function worldToScreen(x, y) {
 }
 
 function draw() {
-  // camera centered on player
-  state.camera.x = player.x - canvas.width / 2;
-  state.camera.y = player.y - canvas.height / 2;
+  // camera: center player on the *visible* center (account for top UI on mobile/in-app browsers)
+  const rect = canvas.getBoundingClientRect();
+  const scale = rect.width ? (canvas.width / rect.width) : 1;
+  const uiTop = document.getElementById('ui');
+  const uiRect = uiTop ? uiTop.getBoundingClientRect() : null;
+  const uiH = uiRect ? (uiRect.height * scale) : 0;
+  const biasY = clamp(uiH * 0.35, 0, 92);
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2 + biasY;
+  state.viewCenter = { x: centerX, y: centerY };
+
+  state.camera.x = player.x - centerX;
+  state.camera.y = player.y - centerY;
 
   ctx.imageSmoothingEnabled = false;
 
