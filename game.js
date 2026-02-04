@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v106';
+const BUILD = 'v107';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1179,7 +1179,7 @@ const weapons = {
     cd: 0,
     baseCooldown: 0.45,
     damage: 12,
-    projectiles: 2,
+    projectiles: 3,
     spread: 0.12,
     speed: 520,
     pierce: 0,
@@ -1192,8 +1192,8 @@ const weapons = {
     cd: 0,
     baseCooldown: 0.8,
     damage: 18,
-    projectiles: 1,
-    spread: 0.03,
+    projectiles: 3,
+    spread: 0.14, // fan spread
     speed: 620,
     pierce: 1,
     bulletR: 6,        // thicker arrow
@@ -1766,10 +1766,10 @@ function fireBullet(fromX, fromY, dirX, dirY, spec) {
   const [nx, ny] = norm(dirX, dirY);
   const r = spec.bulletR || 4;
 
-  // Bow ricochet unlocks with level (Lv5→2, Lv6→4, Lv7→6, Lv8+→8)
+  // Bow ricochet unlocks with level (start at 1; then +1 per bow level, capped)
   let ric = 0;
   if (spec.kind === 'forward') {
-    ric = Math.max(0, Math.min(spec.ricochetMax || 0, Math.max(0, (spec.lvl || 0) - 4) * 2));
+    ric = Math.max(1, Math.min(spec.ricochetMax || 0, (spec.lvl || 1)));
   }
 
   bullets.push({
@@ -4718,7 +4718,7 @@ function resetRun() {
   weapons.wand.lvl = 1;
   weapons.wand.baseCooldown = 0.45;
   weapons.wand.damage = 12;
-  weapons.wand.projectiles = 2;
+  weapons.wand.projectiles = 3;
   weapons.wand.pierce = 0;
   weapons.wand.cd = 0;
 
@@ -4726,7 +4726,7 @@ function resetRun() {
   weapons.bow.lvl = 0;
   weapons.bow.baseCooldown = 0.8;
   weapons.bow.damage = 18;
-  weapons.bow.projectiles = 1;
+  weapons.bow.projectiles = 3;
   weapons.bow.pierce = 1;
   weapons.bow.cd = 0;
 
