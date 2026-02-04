@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v113';
+const BUILD = 'v114';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1658,7 +1658,7 @@ function spawnBoss() {
 
 function spawnFinalBoss() {
   // Lv50 arena duel: one huge boss, no minions.
-  const rr = Math.max(120, Math.min(view.w, view.h) * 0.22);
+  const rr = Math.max(240, Math.min(view.w, view.h) * 0.44); // 2x size
   const sx = player.x + rand(220, 280) * (Math.random() < 0.5 ? -1 : 1);
   const sy = player.y + rand(-160, 160);
 
@@ -1692,6 +1692,7 @@ function spawnFinalBoss() {
     orbCd: 0.22,
     bladeAng: rand(0, Math.PI * 2),
     bladeDmgCd: 0,
+    bladeRad: rr * 1.15,
   };
 
   enemies.push(boss);
@@ -2745,7 +2746,7 @@ function updateEnemies(dt) {
     // final boss blade shield (rotating, contact damage)
     if (e.finalBoss) {
       const nBlades = 10;
-      const rad = e.r + 46;
+      const rad = (e.bladeRad || (e.r + 46));
       const br = 14;
       if ((e.bladeDmgCd || 0) <= 0) {
         for (let k = 0; k < nBlades; k++) {
@@ -3979,7 +3980,7 @@ function draw() {
     // Lv50 final boss: rotating blade shield
     if (e.finalBoss) {
       const nBlades = 10;
-      const rad = e.r + 46;
+      const rad = (e.bladeRad || (e.r + 46));
       for (let k = 0; k < nBlades; k++) {
         const a = (e.bladeAng || 0) + k * (Math.PI * 2 / nBlades);
         const bx = e.x + Math.cos(a) * rad;
