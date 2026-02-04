@@ -4164,6 +4164,11 @@ function startGame() {
   paused = false;
 
   for (let i = 0; i < 12; i++) spawnEnemy();
+
+  // instant cavalry showcase: 4 squads (top x2, bottom x2)
+  // 0=top, 2=bottom
+  for (let k = 0; k < 2; k++) spawnCavalryV(0);
+  for (let k = 0; k < 2; k++) spawnCavalryV(2);
   requestAnimationFrame(loop);
 }
 
