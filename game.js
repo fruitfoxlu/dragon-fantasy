@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v94';
+const BUILD = 'v95';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1114,6 +1114,9 @@ const state = {
   shieldWaves: 0,
   nextCavAt: 240,
   cavWaves: 0,
+
+  // biome transition
+  snowStartAt: null,
 
   // legacy pacing flags
   pendingLevelUps: 0,
@@ -2683,6 +2686,13 @@ function applyLevelStep() {
   } else {
     player.xpNeed = Math.floor(((10 + player.level * 7 + Math.pow(player.level, 1.25)) * 1.25) * 3);
   }
+  // biome: start snow transition at Lv15
+  if (player.level === 15 && state.snowStartAt == null) {
+    state.snowStartAt = state.elapsed;
+    toast.text = (lang === 'zh') ? '第二章：霜雪原（天色轉冷…）' : 'Chapter 2: Frostland (the air turns cold...)';
+    toast.t = 2.2;
+  }
+
   // STRICT: exactly one reward per level
   queueLevelAward(player.level);
 }
@@ -3447,6 +3457,32 @@ function draw() {
         ctx.drawImage(img, sx + ox, sy + oy, tileSize, tileSize);
       }
     }
+  }
+
+  // Biome: snowland transition (starts at Lv15, fades in over ~80s)
+  if (state.snowStartAt != null) {
+    const p = clamp((state.elapsed - state.snowStartAt) / 80, 0, 1);
+
+    // cool tint overlay
+    ctx.save();
+    ctx.globalAlpha = 0.08 + 0.22 * p;
+    ctx.fillStyle = '#cfe6ff';
+    ctx.fillRect(0, 0, view.w, view.h);
+
+    // light frost speckles (tile-stable)
+    ctx.globalAlpha = 0.10 + 0.22 * p;
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    for (let ty = startY; ty <= endY; ty++) {
+      for (let tx = startX; tx <= endX; tx++) {
+        const h = hash2(tx, ty);
+        if ((h & 7) === 0) {
+          const sx = tx * tileSize - state.camera.x + ((h >>> 8) & 15);
+          const sy = ty * tileSize - state.camera.y + ((h >>> 12) & 15);
+          ctx.fillRect(sx, sy, 2, 2);
+        }
+      }
+    }
+    ctx.restore();
   }
 
   // Chest highlight: tint the 3x3 tiles around each chest so players notice it.
