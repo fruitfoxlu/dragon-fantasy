@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v77';
+const BUILD = 'v78';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1126,6 +1126,7 @@ const state = {
 
   doomShards: 0, // collect 3 shards to cast once
   doomLockT: 0,
+  spawnPauseT: 0,
 
   // level-up pacing (strict: one reward per level)
   awardQueue: [],          // [levelNumber]
@@ -2088,12 +2089,15 @@ function doomPulse() {
   toast.text = (lang === 'zh') ? '毀天滅地！' : 'DOOM!';
   toast.t = 1.2;
 
-  // white flash
-  effects.push({ type: 'flash', t: 0, ttl: 0.18, color: 'rgba(255,255,255,1)' });
+  // white flash (hold 1s)
+  effects.push({ type: 'flash', t: 0, ttl: 1.0, color: 'rgba(255,255,255,1)' });
 
   // wipe enemies without triggering loot chains (prevents doom->drops->doom loops)
   state.kills += enemies.length;
   enemies.length = 0;
+
+  // pause new spawns briefly
+  state.spawnPauseT = 3.0;
 }
 
 function doomStrike(free=false) {
@@ -4001,6 +4005,7 @@ function loop(now) {
   if (state.mode === 'play') {
     state.elapsed = (now - state.t0) / 1000;
     state.doomLockT = Math.max(0, (state.doomLockT || 0) - dt);
+    state.spawnPauseT = Math.max(0, (state.spawnPauseT || 0) - dt);
 
     toast.t = Math.max(0, toast.t - dt);
 
@@ -4017,6 +4022,26 @@ function loop(now) {
 
     // spawn pacing ramps up
     enemySpawnAcc += dt;
+
+    // Doom spawn-pause (3s)
+    if ((state.spawnPauseT || 0) > 0) {
+      // still update movement/attacks, but don't spawn more enemies/formations/boss.
+      updateWeapons(dt);
+      updateBullets(dt);
+      collideBullets();
+      updateEffects(dt);
+      updateEnemies(dt);
+      updateVacuumGems(dt);
+      updateHeals(dt);
+      updateDoomOrbs(dt);
+      updateSlots(dt);
+      updateChests(dt);
+      updateGems(dt);
+      draw();
+      updateUI();
+      if (state.mode !== 'dead') requestAnimationFrame(loop);
+      return;
+    }
     // Spawn pacing: every 60s, spawn speed +50% (i.e., interval * 2/3).
     const minute = Math.floor(state.elapsed / 60);
     const speedMul = Math.pow(1.5, minute);
@@ -4105,6 +4130,8 @@ function resetRun() {
   state.kills = 0;
   state.nextBossAt = 60;
   state.doomShards = 0;
+  state.doomLockT = 0;
+  state.spawnPauseT = 0;
   state.awardQueue = [];
   state.awardedLevels = {};
   state.currentAwardLevel = null;
