@@ -163,30 +163,18 @@ body{
   #touch{display:none}
 }
 
-/* Right HUD */
-#hudRight{
-  position:fixed;
-  top:92px;
-  right:14px;
-  width:176px;
-  padding:9px 9px;
-  border-radius:14px;
-  background:rgba(0,0,0,.12);
-  border:1px solid rgba(255,255,255,.10);
-  backdrop-filter: blur(8px);
-  font-size:12px;
-  color:rgba(243,241,231,.92);
-  pointer-events:none; /* never block gameplay */
-}
-.hudTitle{font-weight:900; color:var(--accent); margin-bottom:6px}
-.hudLine{color:var(--muted); margin-bottom:8px}
-.hudSection{font-weight:800; margin-top:6px; margin-bottom:4px; color:rgba(243,241,231,.85)}
-.hudList{display:flex; flex-direction:column; gap:3px}
+/* Inline HUD inside top panel */
+#hudInline{width:100%}
+.hudInlineCol{min-width:160px}
+.hudInlineTitle{font-weight:900; color:rgba(243,241,231,.90); margin-bottom:3px}
+.hudLine{color:var(--muted); margin-bottom:6px}
+.hudList{display:flex; flex-direction:column; gap:2px}
 .hudItem{display:flex; justify-content:space-between; gap:8px}
 .hudItem .n{color:rgba(243,241,231,.90)}
 .hudItem .l{color:var(--accent2)}
 
-/* Make HUD smaller on phones so it doesn't cover play area */
+/* Phone: stack into 2 columns to avoid wrapping too tall */
 @media (max-width: 560px) {
-  #hudRight{ top:82px; right:10px; width:158px; font-size:11px; background:rgba(0,0,0,.08) }
+  #hudInline{gap:10px}
+  .hudInlineCol{min-width:unset; flex:1}
 }

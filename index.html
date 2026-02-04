@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Dragon Fantasy</title>
-  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="stylesheet" href="style.css?v=11" />
 </head>
 <body>
   <div id="ui">
@@ -23,23 +23,30 @@
       <button id="musicBtn" class="miniBtn" type="button" title="Toggle music">Music: OFF</button>
       <button id="langBtn" class="miniBtn" type="button" title="Language">中文</button>
     </div>
+
     <div class="row small">
       <div id="hintMove">Move: WASD / Arrow Keys</div>
       <div id="hintAim">Aim: auto / forward</div>
       <div id="hintPause">Pause: P</div>
     </div>
+
+    <div class="row small" id="hudInline" aria-hidden="true">
+      <div class="hudInlineCol">
+        <div class="hudInlineTitle">Status</div>
+        <div class="hudLine" id="hudSlots">Slots: 0/0</div>
+      </div>
+      <div class="hudInlineCol">
+        <div class="hudInlineTitle">Weapons</div>
+        <div id="hudWeapons" class="hudList"></div>
+      </div>
+      <div class="hudInlineCol">
+        <div class="hudInlineTitle">Magic</div>
+        <div id="hudMagic" class="hudList"></div>
+      </div>
+    </div>
   </div>
 
   <canvas id="game" width="960" height="540"></canvas>
-
-  <div id="hudRight" aria-hidden="true">
-    <div class="hudTitle">Status</div>
-    <div class="hudLine" id="hudSlots">Slots: 0/0</div>
-    <div class="hudSection">Weapons</div>
-    <div id="hudWeapons" class="hudList"></div>
-    <div class="hudSection">Magic</div>
-    <div id="hudMagic" class="hudList"></div>
-  </div>
 
   <div id="start" role="dialog" aria-modal="true" aria-label="Start game">
     <div class="card">
@@ -72,6 +79,6 @@
     <button id="pauseBtn" class="touchBtn" type="button">Pause</button>
   </div>
 
-  <script src="game.js?v=10"></script>
+  <script src="game.js?v=11"></script>
 </body>
 </html>
