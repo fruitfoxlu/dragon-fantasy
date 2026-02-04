@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v66';
+const BUILD = 'v67';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -2489,7 +2489,17 @@ function updateDoomOrbs(dt) {
       doomOrbs.splice(i, 1);
       state.doomShards = (state.doomShards || 0) + 1;
       sfxPickup('reward');
+
       const c = state.doomShards % 3;
+      if (c === 0) {
+        // auto-cast when reaching 3 shards, then reset
+        state.doomShards = 0;
+        toast.text = (lang === 'zh') ? '集滿 3 個碎片！自動施放毀天滅地！' : '3 shards collected! Auto-casting DOOM!';
+        toast.t = 2.0;
+        doomStrike(true);
+        return;
+      }
+
       toast.text = (lang === 'zh') ? `毀天碎片 +1（${c}/3）` : `Doom Shard +1 (${c}/3)`;
       toast.t = 2.0;
       return;
@@ -2761,7 +2771,14 @@ const CHEST_POOL = [
       }
     },
     desc: { zh: '收集 3 個碎片才能施放一次毀天滅地。', en: 'Collect 3 shards to cast Doom once.' },
-    apply() { state.doomShards = (state.doomShards || 0) + 1; sfxPickup('reward'); }
+    apply() {
+      state.doomShards = (state.doomShards || 0) + 1;
+      sfxPickup('reward');
+      if ((state.doomShards % 3) === 0) {
+        state.doomShards = 0;
+        doomStrike(true);
+      }
+    }
   },
 ];
 
