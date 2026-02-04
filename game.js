@@ -2927,6 +2927,20 @@ function draw() {
       const ang = fx.ang || (Math.PI * 0.55);
       const a0 = Math.atan2(fx.fy, fx.fx) - ang / 2;
       const a1 = Math.atan2(fx.fy, fx.fx) + ang / 2;
+
+      // Fill the ground (no tile showing through)
+      const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+      grad.addColorStop(0, 'rgba(120,190,255,.22)');
+      grad.addColorStop(0.55, 'rgba(120,190,255,.18)');
+      grad.addColorStop(1, 'rgba(120,190,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.arc(sx, sy, r, a0, a1);
+      ctx.closePath();
+      ctx.fill();
+
+      // Outline on top
       ctx.strokeStyle = 'rgba(120,190,255,.62)';
       ctx.lineWidth = 3;
       ctx.beginPath();
