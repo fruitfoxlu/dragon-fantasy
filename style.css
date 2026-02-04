@@ -42,7 +42,7 @@ body{
   border:1px solid rgba(246,195,92,.22);
   border-radius:14px;
   backdrop-filter: blur(10px);
-  z-index:5;
+  z-index:10;
 }
 .titleRow{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:6px; flex-wrap:wrap}
 .title{font-weight:800; letter-spacing:.3px; font-size:18px; color:var(--accent)}
