@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v95';
+const BUILD = 'v96';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1117,6 +1117,7 @@ const state = {
 
   // biome transition
   snowStartAt: null,
+  lavaStartAt: null,
 
   // legacy pacing flags
   pendingLevelUps: 0,
@@ -2693,6 +2694,13 @@ function applyLevelStep() {
     toast.t = 2.2;
   }
 
+  // biome: start lava/geothermal transition at Lv30
+  if (player.level === 30 && state.lavaStartAt == null) {
+    state.lavaStartAt = state.elapsed;
+    toast.text = (lang === 'zh') ? '第三章：熔岩地熱（熱浪湧動…）' : 'Chapter 3: Geothermal Rift (heat rises...)';
+    toast.t = 2.2;
+  }
+
   // STRICT: exactly one reward per level
   queueLevelAward(player.level);
 }
@@ -3482,6 +3490,42 @@ function draw() {
         }
       }
     }
+    ctx.restore();
+  }
+
+  // Biome: lava / geothermal transition (starts at Lv30, fades in over ~85s)
+  if (state.lavaStartAt != null) {
+    const p = clamp((state.elapsed - state.lavaStartAt) / 85, 0, 1);
+
+    // warm tint overlay (keep readable; avoid pure red)
+    ctx.save();
+    ctx.globalAlpha = 0.06 + 0.24 * p;
+    ctx.fillStyle = '#ff7a3a';
+    ctx.fillRect(0, 0, view.w, view.h);
+
+    // dark-violet vignette for depth
+    ctx.globalAlpha = 0.05 + 0.18 * p;
+    const vg = ctx.createRadialGradient(view.w/2, view.h/2, 80, view.w/2, view.h/2, Math.max(view.w, view.h) * 0.7);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(40,0,60,0.55)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, view.w, view.h);
+
+    // embers (tile-stable)
+    ctx.globalAlpha = 0.10 + 0.22 * p;
+    for (let ty = startY; ty <= endY; ty++) {
+      for (let tx = startX; tx <= endX; tx++) {
+        const h = hash2(tx, ty);
+        if ((h & 15) === 0) {
+          const sx = tx * tileSize - state.camera.x + ((h >>> 6) & 31);
+          const sy = ty * tileSize - state.camera.y + ((h >>> 11) & 31);
+          const r = 1 + ((h >>> 18) & 1);
+          ctx.fillStyle = ((h >>> 20) & 1) ? 'rgba(255,170,70,.90)' : 'rgba(255,80,40,.85)';
+          ctx.fillRect(sx, sy, r, r);
+        }
+      }
+    }
+
     ctx.restore();
   }
 
