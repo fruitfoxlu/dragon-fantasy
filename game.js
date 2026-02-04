@@ -2920,12 +2920,12 @@ function draw() {
       ctx.save();
       ctx.globalAlpha = 0.95;
 
-      // Big visible label
+      // Big visible label (draw near bottom so it won't be covered by the top HUD)
       ctx.fillStyle = 'rgba(0,0,0,.60)';
-      ctx.fillRect(10, 10, 170, 28);
+      ctx.fillRect(10, canvas.height - 170, 170, 28);
       ctx.fillStyle = 'rgba(255,255,255,.96)';
       ctx.font = '14px ui-monospace, Menlo, monospace';
-      ctx.fillText('DEBUG ON (v13)', 18, 30);
+      ctx.fillText('DEBUG ON (v14)', 18, canvas.height - 150);
 
       // red cross = screen center
       ctx.strokeStyle = 'rgba(255,80,80,.98)';
@@ -2937,17 +2937,22 @@ function draw() {
       ctx.lineTo(cx, cy + 40);
       ctx.stroke();
 
-      // cyan circle = computed player screen position
-      ctx.strokeStyle = 'rgba(80,200,255,.98)';
-      ctx.lineWidth = 4;
+      // SUPER obvious marker at computed player screen position
+      ctx.fillStyle = 'rgba(255,0,255,.35)';
       ctx.beginPath();
-      ctx.arc(psx, psy, 26, 0, Math.PI * 2);
+      ctx.arc(psx, psy, 36, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(80,200,255,.98)';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(psx, psy, 32, 0, Math.PI * 2);
       ctx.stroke();
 
       // bounding box around where hero sprite should be
       ctx.strokeStyle = 'rgba(246,195,92,.95)';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(psx - 28, psy - 28, 56, 56);
+      ctx.lineWidth = 4;
+      ctx.strokeRect(psx - 32, psy - 32, 64, 64);
       ctx.lineWidth = 1;
 
       // bottom single-line numbers
