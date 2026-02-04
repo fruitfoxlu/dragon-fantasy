@@ -1191,9 +1191,9 @@ function spawnEnemy() {
       if (weapons.meteor.enabled) candidates.push(weapons.meteor.impactDamage);
 
       const weakest = Math.max(1, Math.min(...(candidates.length ? candidates : [weapons.wand.damage])));
-      hp = Math.min(hp, weakest * 0.95);
+      hp = Math.min(hp, weakest * 1.25);
     } else {
-      const mul = Math.min(2.2, 1 + 0.12 * (player.level - 10));
+      const mul = Math.min(2.6, 1 + 0.16 * (player.level - 10));
       hp *= mul;
     }
   }
