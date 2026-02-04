@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v93';
+const BUILD = 'v94';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -77,6 +77,7 @@ const ui = {
   joy: document.getElementById('joy'),
   joyKnob: document.querySelector('#joy .joyKnob'),
   pauseBtn: document.getElementById('pauseBtn'),
+  touch: document.getElementById('touch'),
   hudWeapons: document.getElementById('hudWeapons'),
   hudMagic: document.getElementById('hudMagic'),
   hudChestHint: document.getElementById('hudChestHint'),
@@ -4089,6 +4090,13 @@ function updateUI() {
   if (ui.hudChestHint) {
     const n = chests.length;
     ui.hudChestHint.textContent = n ? `Chest: ${n}` : '';
+  }
+
+  // Touch UI should only appear during gameplay (not on start / modals)
+  if (ui.touch) {
+    const shouldShow = (state.mode === 'play');
+    ui.touch.style.display = shouldShow ? '' : 'none';
+    ui.touch.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
   }
 }
 
