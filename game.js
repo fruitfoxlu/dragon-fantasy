@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v100';
+const BUILD = 'v101';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -3458,16 +3458,21 @@ function openChest() {
       currentChoices.push(u);
     }
 
-    // fill remaining: only with XP if allowed; otherwise keep duplicating spells
-    // (duplicates are fine here; the goal is: chest shows spells-only until late game)
+    // fill remaining: NEVER duplicate the same spell option.
+    // If we still can't fill to 3 (very rare), use XP as a last-resort filler.
     let k = 1;
     while (currentChoices.length < 3) {
-      if (xpAllowed) {
-        currentChoices.push(xpOpt(0.7 + 0.1 * (k - 1), 90 + k));
-        k++;
-      } else {
-        currentChoices.push(pick(currentChoices));
+      const remaining = pool.filter(u => !used.has(u.id));
+      if (remaining.length) {
+        const u = pick(remaining);
+        used.add(u.id);
+        currentChoices.push(u);
+        continue;
       }
+
+      // no more unique spell options
+      currentChoices.push(xpOpt(0.7 + 0.1 * (k - 1), 90 + k));
+      k++;
     }
   }
 
