@@ -2371,9 +2371,10 @@ function checkLevelUp() {
   // If upgrades come in too fast, auto-pick most of them so gameplay doesn't freeze.
   const minGap = 2.2; // seconds between opening modals
   if ((state.elapsed - state.lastLevelUpAt) < minGap) {
-    // consume one pending without pausing
-    autoPickUpgrade();
-    state.pendingLevelUps = Math.max(0, state.pendingLevelUps - 1);
+    // drain several pending upgrades per frame without pausing
+    const n = Math.min(6, state.pendingLevelUps);
+    for (let i = 0; i < n; i++) autoPickUpgrade();
+    state.pendingLevelUps = Math.max(0, state.pendingLevelUps - n);
     return;
   }
 
@@ -2419,7 +2420,7 @@ const CHEST_POOL = [
     id: 'chest_frost_big',
     title: { zh: '冰霜王印：衝擊波範圍 +35', en: 'Frost Sigil: Shockwave Radius +35' },
     desc: { zh: '控場覆蓋更大。', en: 'Bigger crowd-control area.' },
-    apply() { weapons.frost.maxRadius += 35; }
+    apply() { if (weapons.frost.enabled) weapons.frost.maxRadius += 35; }
   },
   {
     id: 'chest_meteor_big',
@@ -3591,8 +3592,8 @@ function resetRun() {
 
   weapons.meteor.enabled = false;
   weapons.meteor.lvl = 0;
-  weapons.meteor.followTrail = false;
-  weapons.meteor.trailDelay = 1.0;
+  weapons.meteor.followTrail = true;
+  weapons.meteor.trailDelay = 1.1;
   weapons.meteor.baseCooldown = 2.4;
   weapons.meteor.impactDamage = 88;
   weapons.meteor.impactRadius = 90;
