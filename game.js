@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v99';
+const BUILD = 'v100';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1820,6 +1820,11 @@ function killEnemyAt(index) {
 
   // loot
   if (e.type === 'boss') {
+    if (e.finalBoss) {
+      sfxPickup('reward');
+      endRunVictory();
+      return;
+    }
     // Big Boss always drops big rewards.
     sfxPickup('reward');
     const chestMul = e.purpleBoss ? 2 : 1;
@@ -2483,10 +2488,84 @@ function updateEnemies(dt) {
         }
 
       } else if (e.type === 'boss') {
-        // --- Big Boss AI (no bullets): charge / slam / summon
-        e.chargeCd = Math.max(0, e.chargeCd - dt);
-        e.slamCd = Math.max(0, e.slamCd - dt);
-        e.summonCd = Math.max(0, e.summonCd - dt);
+        if (e.finalBoss) {
+          // --- Lv50 Final Boss AI: arena duel (no minions)
+          e.slamCd = Math.max(0, (e.slamCd || 0) - dt);
+          e.pulseCd = Math.max(0, (e.pulseCd || 0) - dt);
+          e.orbCd = Math.max(0, (e.orbCd || 0) - dt);
+          e.bladeAng = (e.bladeAng || 0) + dt * 1.6;
+          e.bladeDmgCd = Math.max(0, (e.bladeDmgCd || 0) - dt);
+
+          // slam (floor AoE with telegraph)
+          if ((e.slamWindup || 0) > 0) {
+            e.slamWindup -= dt;
+            if (e.slamWindup <= 0) {
+              const rr = e.r * 1.35;
+              effects.push({ type: 'boss_slam', x: e.x, y: e.y, t: 0, ttl: 0.45, radius: rr });
+              e.slamCd = rand(4.3, 5.4);
+            }
+          } else if ((e.slamCd || 0) <= 0 && d < e.r * 3.2) {
+            const rr = e.r * 1.35;
+            effects.push({ type: 'boss_slam_warn', x: e.x, y: e.y, t: 0, ttl: 0.75, radius: rr });
+            e.slamWindup = 0.75;
+            e.slamCd = 99; // prevent re-arming during windup
+          }
+
+          // 8-way pulse
+          if ((e.pulseCd || 0) <= 0) {
+            const sp = 260;
+            for (let k = 0; k < 8; k++) {
+              const a = k * (Math.PI * 2 / 8) + rand(-0.05, 0.05);
+              enemyBullets.push({
+                x: e.x,
+                y: e.y,
+                vx: Math.cos(a) * sp,
+                vy: Math.sin(a) * sp,
+                r: 7,
+                dmg: 18,
+                life: 2.8,
+                kind: 'pulse',
+                age: 0,
+                arm: 0.15,
+              });
+            }
+            e.pulseCd = rand(2.2, 3.2);
+          }
+
+          // slow irregular energy orbs (max 40, ttl 5s, safe delay)
+          const duelAge = (state.finalBossStartAt != null) ? (state.elapsed - state.finalBossStartAt) : 999;
+          const orbCount = enemyBullets.reduce((n, b) => n + (b.kind === 'orb' ? 1 : 0), 0);
+          if (duelAge > 0.8 && (e.orbCd || 0) <= 0 && orbCount < 40) {
+            const sp = rand(70, 120);
+            const a = rand(0, Math.PI * 2);
+            // spawn slightly offset from the boss so it can't instantly collide with the player
+            const ox = Math.cos(a) * (e.r + 22);
+            const oy = Math.sin(a) * (e.r + 22);
+            enemyBullets.push({
+              x: e.x + ox,
+              y: e.y + oy,
+              vx: Math.cos(a) * sp,
+              vy: Math.sin(a) * sp,
+              r: 8,
+              dmg: 14,
+              life: 5.0,
+              kind: 'orb',
+              age: 0,
+              arm: 0.35,
+            });
+            e.orbCd = rand(0.08, 0.24);
+          }
+
+          // movement: steady pressure (slight strafe)
+          const strafe = Math.sin(state.elapsed * 0.85) * 0.25;
+          e.x += (nx * e.speed + (-ny) * e.speed * strafe) * dt;
+          e.y += (ny * e.speed + (nx) * e.speed * strafe) * dt;
+
+        } else {
+          // --- Big Boss AI (no bullets): charge / slam / summon
+          e.chargeCd = Math.max(0, e.chargeCd - dt);
+          e.slamCd = Math.max(0, e.slamCd - dt);
+          e.summonCd = Math.max(0, e.summonCd - dt);
 
         if (e.chargeT > 0) {
           // charging
@@ -2555,6 +2634,7 @@ function updateEnemies(dt) {
           // default chase
           e.x += nx * e.speed * dt;
           e.y += ny * e.speed * dt;
+        }
         }
       } else if (e.elite) {
         // --- Elite skill: occasional charge (no bullets)
@@ -2650,6 +2730,33 @@ function updateEnemies(dt) {
         const [nx, ny] = norm(player.x - e.x, player.y - e.y);
         player.x += nx * (e.type === 'boss' ? 26 : 14);
         player.y += ny * (e.type === 'boss' ? 26 : 14);
+      }
+    }
+
+    // final boss blade shield (rotating, contact damage)
+    if (e.finalBoss) {
+      const nBlades = 10;
+      const rad = e.r + 46;
+      const br = 14;
+      if ((e.bladeDmgCd || 0) <= 0) {
+        for (let k = 0; k < nBlades; k++) {
+          const a = (e.bladeAng || 0) + k * (Math.PI * 2 / nBlades);
+          const bx = e.x + Math.cos(a) * rad;
+          const by = e.y + Math.sin(a) * rad;
+          const dd = dist(bx, by, player.x, player.y);
+          if (dd < br + player.r) {
+            if (player.invuln <= 0) {
+              player.hp -= 22;
+              sfxHit();
+              player.invuln = 0.45;
+              const [nx, ny] = norm(player.x - bx, player.y - by);
+              player.x += nx * 24;
+              player.y += ny * 24;
+            }
+            e.bladeDmgCd = 0.20;
+            break;
+          }
+        }
       }
     }
 
@@ -3247,9 +3354,9 @@ const UPGRADE_POOL = [
   },
   {
     id: 'magnet',
-    title: '龍之召喚：拾取範圍 +25',
+    title: '龍之召喚：拾取範圍 +50',
     desc: '更容易吸到經驗之魂。',
-    apply() { player.magnet += 25; player.passives.magnet = (player.passives.magnet || 0) + 1; }
+    apply() { player.magnet += 50; player.passives.magnet = (player.passives.magnet || 0) + 1; }
   },
 ];
 
@@ -3848,11 +3955,24 @@ function draw() {
     const f = frozen ? 0 : (Math.floor(e.anim * 8) % 4);
 
     const base = (e.type === 'ranger') ? SPR.skullRanger : SPR.skullMelee;
-    const scale = e.elite ? 5.0 : (e.big ? 2.0 : (e.type === 'shield' ? 1.15 : (e.type === 'cav' ? 1.05 : 1.0)));
+    const scale = e.finalBoss ? Math.max(7.5, e.r / 18) : (e.elite ? 5.0 : (e.big ? 2.0 : (e.type === 'shield' ? 1.15 : (e.type === 'cav' ? 1.05 : 1.0))));
     const alpha = frozen ? 0.75 : 1;
 
     // Elite visual: add a golden helmet overlay + glowing eyes
     drawSprite(base[e.dir][f], sx, sy, { scale, alpha });
+
+    // Lv50 final boss: rotating blade shield
+    if (e.finalBoss) {
+      const nBlades = 10;
+      const rad = e.r + 46;
+      for (let k = 0; k < nBlades; k++) {
+        const a = (e.bladeAng || 0) + k * (Math.PI * 2 / nBlades);
+        const bx = e.x + Math.cos(a) * rad;
+        const by = e.y + Math.sin(a) * rad;
+        const [bsx, bsy] = worldToScreen(bx, by);
+        drawSprite(SPR.blade, bsx, bsy, { scale: 1.2, rot: a, alpha: 0.95 });
+      }
+    }
 
     // Cavalry overlay (lance + horse blocky silhouette)
     if (e.type === 'cav' && !frozen) {
@@ -4494,6 +4614,13 @@ function resetRun() {
   state.nextCavAt = 240;
   state.cavWaves = 0;
 
+  state.phase = 'horde';
+  state.finalBossStarted = false;
+  state.finalBossDefeated = false;
+  state.finalBossStartAt = null;
+  state.runEndedAt = null;
+  ui.summary?.classList.add('hidden');
+
   // spawn at a tile center so camera feels centered and joystick is stable
   player.x = 16;
   player.y = 16;
@@ -4597,6 +4724,54 @@ function startGame() {
 }
 
 ui.startBtn?.addEventListener('click', startGame);
+
+ui.restartBtn?.addEventListener('click', () => {
+  ui.summary?.classList.add('hidden');
+
+  state.phase = 'horde';
+  state.finalBossStarted = false;
+  state.finalBossDefeated = false;
+  state.finalBossStartAt = null;
+  state.runEndedAt = null;
+
+  // restart immediately (no start screen)
+  resetRun();
+  state.t0 = performance.now();
+  last = state.t0;
+  state.mode = 'play';
+  paused = false;
+
+  for (let i = 0; i < 12; i++) spawnEnemy();
+  requestAnimationFrame(loop);
+});
+
+ui.shareBtn?.addEventListener('click', async () => {
+  const timeSec = Math.max(0, state.runEndedAt || state.elapsed);
+  const score = Math.floor(state.kills * 10 + timeSec * 2 + player.level * 50);
+  const text = (lang === 'zh')
+    ? `Dragon Fantasy：我在 Lv${player.level} 擊敗了最終 Boss！分數 ${score}（擊殺 ${state.kills} · ${formatTime(timeSec | 0)}）`
+    : `Dragon Fantasy: I beat the final boss at Lv${player.level}! Score ${score} (Kills ${state.kills} · ${formatTime(timeSec | 0)})`;
+
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'Dragon Fantasy', text, url: location.href });
+    } else {
+      await navigator.clipboard.writeText(text + ' ' + location.href);
+      if (ui.summaryHint) ui.summaryHint.textContent = (lang === 'zh') ? '已複製到剪貼簿' : 'Copied to clipboard';
+    }
+  } catch {
+    // ignore (user canceled)
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (state.mode === 'summary') {
+    if (e.key === 'Enter' || e.key === ' ') {
+      ui.restartBtn?.click();
+      e.preventDefault();
+    }
+  }
+});
 
 // init language (safe now)
 setLang(lang);
