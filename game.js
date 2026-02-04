@@ -68,6 +68,8 @@ const ui = {
   hpFill: document.getElementById('hpFill'),
   sfxBtn: document.getElementById('sfxBtn'),
   langBtn: document.getElementById('langBtn'),
+  doomBtn: document.getElementById('doomBtn'),
+  doomTouchBtn: document.getElementById('doomTouchBtn'),
   start: document.getElementById('start'),
   startBtn: document.getElementById('startBtn'),
   levelup: document.getElementById('levelup'),
@@ -339,6 +341,31 @@ function sfxGameOver() {
   } catch {}
 }
 
+function sfxDoom() {
+  if (!audio.sfxOn) return;
+  try {
+    ensureAudio();
+    if (audio.ctx.state === 'suspended') audio.ctx.resume();
+    const t = audio.ctx.currentTime;
+    const mk = (freq, when, dur, g0, kind='sawtooth') => {
+      const o = audio.ctx.createOscillator();
+      const g = audio.ctx.createGain();
+      o.type = kind;
+      o.frequency.setValueAtTime(freq, when);
+      o.frequency.exponentialRampToValueAtTime(Math.max(40, freq*0.45), when + dur);
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(g0, when + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      o.connect(g);
+      g.connect(audio.master);
+      o.start(when);
+      o.stop(when + dur + 0.03);
+    };
+    mk(260, t, 0.34, 0.06, 'sawtooth');
+    mk(180, t + 0.06, 0.38, 0.05, 'triangle');
+    mk(520, t + 0.10, 0.18, 0.03, 'square');
+  } catch {}
+}
 function sfxPickup(type) {
   if (!audio.sfxOn) return;
   // Subtle, pleasant 32-bit style chime (varied so it won't get annoying)
@@ -746,6 +773,13 @@ const SPR = {
     px(g, 2, 4, 6, 4, 'rgba(246,195,92,.85)');
   }),
 
+  orbDoom: makeSprite(12, 12, (g) => {
+    px(g, 5, 1, 2, 2, '#fff6dc');
+    px(g, 4, 4, 4, 4, 'rgba(180,90,255,.95)');
+    px(g, 3, 5, 6, 4, 'rgba(180,90,255,.80)');
+    outline(g, 3, 3, 6, 7, 'rgba(0,0,0,.30)');
+  }),
+
   vacuumGem: makeSprite(16, 16, (g) => {
     // a bright cyan gem
     px(g, 7, 1, 2, 2, '#ffffff');
@@ -1077,6 +1111,12 @@ const state = {
   camera: { x: 0, y: 0 },
 
   nextBossAt: 300,
+
+  doomCharges: 3,
+
+  // level-up pacing
+  pendingLevelUps: 0,
+  lastLevelUpAt: -999,
 };
 
 const player = {
@@ -1228,6 +1268,7 @@ const chests = [];        // {x,y,r}
 const slotOrbs = [];      // {x,y,r}
 const vacuumGems = [];    // {x,y,r}
 const heals = [];         // {x,y,r, amount}
+const doomOrbs = [];      // {x,y,r}
 
 // Visual/area effects
 const effects = [];
@@ -1449,6 +1490,8 @@ function killEnemyAt(index) {
     }
     // Boss: guaranteed vacuum gem
     vacuumGems.push({ x: e.x, y: e.y, r: 14 });
+    // Boss drop: doom orb (adds +1 doom charge, unlimited stacking)
+    doomOrbs.push({ x: e.x + rand(-16, 16), y: e.y + rand(-16, 16), r: 12 });
   } else if (e.elite) {
     // Elite: guaranteed chest + extra chance.
     sfxPickup('reward');
@@ -1820,6 +1863,24 @@ function updateDragonSoul(dt) {
   }
 }
 
+function doomStrike() {
+  if (state.mode !== 'play' || paused) return;
+  if (state.doomCharges <= 0) return;
+
+  state.doomCharges -= 1;
+  sfxDoom();
+  toast.text = (lang === 'zh') ? `毀天滅地！(${state.doomCharges})` : `DOOM! (${state.doomCharges})`;
+  toast.t = 1.4;
+
+  // screen effect
+  effects.push({ type: 'doom', t: 0, ttl: 0.55 });
+
+  // kill everything on the field (including boss)
+  while (enemies.length) {
+    killEnemyAt(enemies.length - 1);
+  }
+}
+
 function updateWeapons(dt) {
   updateProjectileWeapons(dt);
   updateWhirlingBlades(dt);
@@ -2082,6 +2143,21 @@ function updateHeals(dt) {
   }
 }
 
+function updateDoomOrbs(dt) {
+  for (let i = doomOrbs.length - 1; i >= 0; i--) {
+    const o = doomOrbs[i];
+    const d = dist(player.x, player.y, o.x, o.y);
+    if (d < player.r + o.r) {
+      doomOrbs.splice(i, 1);
+      state.doomCharges += 1; // no cap
+      sfxPickup('reward');
+      toast.text = (lang === 'zh') ? `毀天滅地 +1（${state.doomCharges}）` : `Doom +1 (${state.doomCharges})`;
+      toast.t = 2.0;
+      return;
+    }
+  }
+}
+
 function updateSlots(dt) {
   for (let i = slotOrbs.length - 1; i >= 0; i--) {
     const s = slotOrbs[i];
@@ -2220,18 +2296,91 @@ function updateEffects(dt) {
   }
 }
 
-function checkLevelUp() {
-  while (player.xp >= player.xpNeed && state.mode === 'play') {
-    player.xp -= player.xpNeed;
-    player.level += 1;
-    // XP needed: fast early, then ramps harder.
-    if (player.level < 5) {
-      player.xpNeed = Math.floor((8 + player.level * 6) * 3);
-    } else {
-      player.xpNeed = Math.floor(((10 + player.level * 7 + Math.pow(player.level, 1.25)) * 1.25) * 3);
-    }
-    openLevelUp();
+function applyLevelStep() {
+  player.xp -= player.xpNeed;
+  player.level += 1;
+  // XP needed: fast early, then ramps harder.
+  if (player.level < 5) {
+    player.xpNeed = Math.floor((8 + player.level * 6) * 3);
+  } else {
+    player.xpNeed = Math.floor(((10 + player.level * 7 + Math.pow(player.level, 1.25)) * 1.25) * 3);
   }
+}
+
+function autoPickUpgrade() {
+  // Pick 1 upgrade without pausing (prevents late-game modal spam).
+  // Preserve "at least one magic" bias by preferring magic pool if available.
+  const pool = UPGRADE_POOL.filter(u => {
+    // reuse the same gating rules as openChoiceModal
+    if (u.id.startsWith('bow_') && !weapons.bow.enabled) return false;
+    if (u.id === 'unlock_bow' && weapons.bow.enabled) return false;
+
+    if (u.id.startsWith('blades_') && !weapons.blades.enabled) return false;
+    if (u.id === 'unlock_blades' && weapons.blades.enabled) return false;
+
+    if (u.id.startsWith('holy_') && !weapons.holy.enabled) return false;
+    if (u.id === 'unlock_holy' && weapons.holy.enabled) return false;
+
+    if (u.id.startsWith('lightning_') && !weapons.lightning.enabled) return false;
+    if (u.id === 'unlock_lightning' && weapons.lightning.enabled) return false;
+
+    if (u.id.startsWith('meteor_') && !weapons.meteor.enabled) return false;
+    if (u.id === 'unlock_meteor' && weapons.meteor.enabled) return false;
+
+    if (u.id.startsWith('frost_') && !weapons.frost.enabled) return false;
+    if (u.id === 'unlock_frost' && weapons.frost.enabled) return false;
+
+    // dragon sequence gate
+    if (u.id.startsWith('dragon_') && !weapons.dragon.enabled) return false;
+    if (u.id === 'unlock_dragon' && weapons.dragon.enabled) return false;
+    const nextD = nextDragonUpgradeId();
+    if (u.id.startsWith('dragon_')) {
+      if (!nextD) return false;
+      if (u.id !== nextD) return false;
+    }
+
+    // hide frost cone-only? none
+    return true;
+  });
+
+  const magicPool = pool.filter(u => (
+    u.id === 'unlock_meteor' || u.id.startsWith('meteor_') ||
+    u.id === 'unlock_frost' || u.id.startsWith('frost_') ||
+    u.id === 'unlock_lightning' || u.id.startsWith('lightning_') ||
+    u.id === 'unlock_dragon' || u.id.startsWith('dragon_')
+  ));
+
+  const pickFrom = magicPool.length ? magicPool : pool;
+  if (!pickFrom.length) return;
+  const u = pick(pickFrom);
+  u.apply();
+  toast.text = (lang === 'zh') ? `自動升級：${u.title}` : `Auto Upgraded: ${u.title}`;
+  toast.t = 1.2;
+}
+
+function checkLevelUp() {
+  // Convert XP into level steps and queue upgrades.
+  while (player.xp >= player.xpNeed && state.mode === 'play') {
+    applyLevelStep();
+    state.pendingLevelUps += 1;
+  }
+
+  if (state.mode !== 'play') return;
+  if (state.pendingLevelUps <= 0) return;
+
+  // If upgrades come in too fast, auto-pick most of them so gameplay doesn't freeze.
+  const minGap = 2.2; // seconds between opening modals
+  if ((state.elapsed - state.lastLevelUpAt) < minGap) {
+    // consume one pending without pausing
+    autoPickUpgrade();
+    state.pendingLevelUps = Math.max(0, state.pendingLevelUps - 1);
+    return;
+  }
+
+  // otherwise open the normal modal
+  state.pendingLevelUps = Math.max(0, state.pendingLevelUps - 1);
+  state.lastLevelUpAt = state.elapsed;
+  openLevelUp();
 }
 
 // ---------- upgrades
@@ -2736,6 +2885,11 @@ function chooseUpgrade(idx) {
   ui.levelup.classList.add('hidden');
   state.mode = 'play';
   paused = false;
+
+  // If more level-ups are pending, resolve them without freezing gameplay.
+  // (checkLevelUp will either auto-pick or open another modal later)
+  checkLevelUp();
+
   requestAnimationFrame(loop);
 }
 
@@ -2828,6 +2982,12 @@ function draw() {
   for (const h of heals) {
     const [sx, sy] = worldToScreen(h.x, h.y);
     drawSprite(SPR.heal, sx, sy, { scale: 1.1, alpha: 0.98 });
+  }
+
+  // doom orbs
+  for (const o of doomOrbs) {
+    const [sx, sy] = worldToScreen(o.x, o.y);
+    drawSprite(SPR.orbDoom, sx, sy, { scale: 1.25, alpha: 0.98 });
   }
 
   // weapon slot orbs
@@ -2999,6 +3159,18 @@ function draw() {
 
   // effects: lightning bolts & meteors & wave
   for (const fx of effects) {
+    if (fx.type === 'doom') {
+      const a = 1 - fx.t / fx.ttl;
+      // full-screen flash + vignette
+      ctx.save();
+      ctx.globalAlpha = 0.85 * a;
+      ctx.fillStyle = 'rgba(180,90,255,1)';
+      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.globalAlpha = 0.55 * a;
+      ctx.fillStyle = 'rgba(0,0,0,1)';
+      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.restore();
+    }
     if (fx.type === 'bolt') {
       // true "chain" look: draw a jagged line segment-by-segment between targets
       const a = 1 - fx.t / fx.ttl;
@@ -3248,6 +3420,9 @@ function updateUI() {
   // right HUD
   if (ui.hudSlots) ui.hudSlots.textContent = `Slots: ${weaponEnabledCount()}/${player.weaponSlots} (Max ${player.weaponSlotsMax})`;
 
+  if (ui.doomBtn) ui.doomBtn.textContent = `Doom: ${state.doomCharges}`;
+  if (ui.doomTouchBtn) ui.doomTouchBtn.textContent = `Doom: ${state.doomCharges}`;
+
   if (ui.hudWeapons) {
     const ws = enabledWeaponKeys();
     ui.hudWeapons.innerHTML = ws.map(k => {
@@ -3325,6 +3500,7 @@ function loop(now) {
     updateEnemies(dt);
     updateVacuumGems(dt);
     updateHeals(dt);
+    updateDoomOrbs(dt);
     updateSlots(dt);
     updateChests(dt);
     updateGems(dt);
@@ -3345,6 +3521,7 @@ function resetRun() {
   slotOrbs.length = 0;
   vacuumGems.length = 0;
   heals.length = 0;
+  doomOrbs.length = 0;
   effects.length = 0;
 
   toast.text = '';
@@ -3356,6 +3533,7 @@ function resetRun() {
   state.elapsed = 0;
   state.kills = 0;
   state.nextBossAt = 300;
+  state.doomCharges = 3;
 
   // spawn at a tile center so camera feels centered and joystick is stable
   player.x = 16;
