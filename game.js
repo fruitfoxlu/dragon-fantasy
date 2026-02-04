@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v72';
+const BUILD = 'v73';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1892,26 +1892,33 @@ function updateChainLightning(dt) {
   const shots = Math.max(1, w.shots || 1);
   const chainsPer = Math.max(1, Math.min(w.chains || 1, 50));
 
-  // sort enemies once by distance to player
-  const sorted = enemies.slice();
-  sorted.sort((a, b) => (dist(player.x, player.y, a.x, a.y) - dist(player.x, player.y, b.x, b.y)));
+  // sort enemies once by distance to player (precompute d2, avoid expensive comparator)
+  const sorted = enemies.map(e => {
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    return { e, d2: dx*dx + dy*dy };
+  });
+  sorted.sort((a, b) => a.d2 - b.d2);
 
   let any = false;
   for (let s = 0; s < shots; s++) {
     const start = s * chainsPer;
     if (start >= sorted.length) break;
-    const targets = sorted.slice(start, start + chainsPer);
-    if (!targets.length) break;
 
+    const tset = new Set();
     const pts = [[player.x, player.y]];
-    for (const e of targets) pts.push([e.x, e.y]);
 
-    // damage targets
+    for (let j = start; j < Math.min(sorted.length, start + chainsPer); j++) {
+      const e = sorted[j].e;
+      tset.add(e);
+      pts.push([e.x, e.y]);
+    }
+    if (tset.size === 0) break;
+
+    // damage targets (single scan)
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
-      // membership check: only damage if in this target chunk
-      // (targets are small, so this stays cheap)
-      if (!targets.includes(e)) continue;
+      if (!tset.has(e)) continue;
       damageEnemy(e, w.damage, player.x, player.y);
       const [nx, ny] = norm(e.x - player.x, e.y - player.y);
       e.vx += nx * 60;
