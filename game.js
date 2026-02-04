@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v65';
+const BUILD = 'v66';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1124,7 +1124,7 @@ const state = {
   // formation schedule
   nextShieldWallAt: 60,
   shieldWaves: 0,
-  nextCavAt: 80,
+  nextCavAt: 60,
   cavWaves: 0,
 
   // legacy pacing flags
@@ -4010,7 +4010,7 @@ function loop(now) {
       for (let k = 0; k < spawnN; k++) {
         spawnCavalryV(((Math.random() * 4) | 0));
       }
-      state.nextCavAt += 80;
+      state.nextCavAt += 60;
     }
 
     updateWeapons(dt);
@@ -4063,7 +4063,7 @@ function resetRun() {
 
   state.nextShieldWallAt = 60;
   state.shieldWaves = 0;
-  state.nextCavAt = 80;
+  state.nextCavAt = 60;
   state.cavWaves = 0;
 
   // spawn at a tile center so camera feels centered and joystick is stable
@@ -4165,10 +4165,7 @@ function startGame() {
 
   for (let i = 0; i < 12; i++) spawnEnemy();
 
-  // instant cavalry showcase: 4 squads (top x2, bottom x2)
-  // 0=top, 2=bottom
-  for (let k = 0; k < 2; k++) spawnCavalryV(0);
-  for (let k = 0; k < 2; k++) spawnCavalryV(2);
+  // cavalry will start spawning by schedule (~every minute)
   requestAnimationFrame(loop);
 }
 
