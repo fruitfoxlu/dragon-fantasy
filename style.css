@@ -29,6 +29,7 @@ body{
   border:0;
   border-radius:0;
   background:#070a16;
+  touch-action:none;
 }
 #ui{
   position:fixed;
@@ -127,6 +128,7 @@ body{
   position:fixed;
   inset:0;
   pointer-events:none;
+  z-index:6; /* above canvas */
 }
 .joy{
   position:fixed;
