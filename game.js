@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v96';
+const BUILD = 'v97';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -3172,11 +3172,15 @@ function openChest() {
     }
   });
 
-  // If all magic are capped, go full XP.
-  const allMagicCapped = magicCapped('meteor') && magicCapped('frost') && magicCapped('lightning') && magicCapped('dragon');
+  // XP (Soul Surge) should NOT appear early.
+  // Rule: only allow XP options when you have at least TWO spells at cap,
+  // and the chest cannot produce 3 spell options.
+  const cappedCount = ['meteor','frost','lightning','dragon'].reduce((a,k)=>a+(magicCapped(k)?1:0),0);
+  const xpAllowed = (cappedCount >= 2);
 
   currentChoices = [];
-  if (allMagicCapped || pool.length === 0) {
+  if (pool.length === 0) {
+    // No spell options available at all (should be rare); fall back to XP.
     currentChoices = [xpOpt(0.6, 1), xpOpt(0.8, 2), xpOpt(1.0, 3)];
   } else {
     const used = new Set();
@@ -3186,11 +3190,17 @@ function openChest() {
       used.add(u.id);
       currentChoices.push(u);
     }
-    // fill remaining with XP
+
+    // fill remaining: only with XP if allowed; otherwise keep duplicating spells
+    // (duplicates are fine here; the goal is: chest shows spells-only until late game)
     let k = 1;
     while (currentChoices.length < 3) {
-      currentChoices.push(xpOpt(0.7 + 0.1 * (k - 1), 90 + k));
-      k++;
+      if (xpAllowed) {
+        currentChoices.push(xpOpt(0.7 + 0.1 * (k - 1), 90 + k));
+        k++;
+      } else {
+        currentChoices.push(pick(currentChoices));
+      }
     }
   }
 
