@@ -2963,7 +2963,7 @@ const UPGRADE_POOL = [
   {
     id: 'lightning_nocd',
     title: '雷電鏈：究極（無冷卻）',
-    desc: '達成 5 條 + 50 跳躍後，冷卻幾乎為 0。',
+    desc: '雷電鏈 Lv20 後才會出現。究極形態：5 條、50 跳躍、無冷卻。',
     apply() {
       weapons.lightning.shots = 5;
       weapons.lightning.chains = 50;
@@ -3161,6 +3161,8 @@ function openChoiceModal(mode, title, poolBase) {
     // gate lightning upgrades
     if (u.id.startsWith('lightning_') && !weapons.lightning.enabled) return false;
     if (u.id === 'unlock_lightning' && weapons.lightning.enabled) return false;
+    // lock ultimate lightning until lightning reaches level 20
+    if (u.id === 'lightning_nocd' && (weapons.lightning.lvl || 0) < 20) return false;
 
     // gate meteor upgrades
     if (u.id.startsWith('meteor_') && !weapons.meteor.enabled) return false;
