@@ -3101,8 +3101,7 @@ function draw() {
 
 function updateUI() {
   const hp01 = clamp(player.hp / player.hpMax, 0, 1);
-  // hp numbers hidden (bars only)
-  if (ui.hp) ui.hp.textContent = '';
+  ui.hp.textContent = `${Math.max(0, player.hp | 0)} / ${player.hpMax}`;
   if (ui.hpFill) ui.hpFill.style.width = `${Math.round(hp01 * 100)}%`;
 
   ui.level.textContent = String(player.level);
