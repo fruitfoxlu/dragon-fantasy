@@ -1175,12 +1175,12 @@ const weapons = {
     enabled: false,
     lvl: 0,
     crosses: 1,
-    radius: 110,
-    crossSize: 14,
+    radius: 330,
+    crossSize: 42,
     damage: 120,
     tick: 0.18,
     ang: 0,
-    angSpeed: 2.6,
+    angSpeed: 7.8,
     jitter: 0.7,
   },
 };
@@ -2687,7 +2687,7 @@ function draw() {
     const w = weapons.dragon;
     for (let i = 0; i < w.crosses; i++) {
       const ang = w.ang + i * (Math.PI * 2 / w.crosses);
-      const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 18;
+      const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * (18 * 3);
       const bx = player.x + Math.cos(ang) * rad;
       const by = player.y + Math.sin(ang) * rad;
       const [sx, sy] = worldToScreen(bx, by);
