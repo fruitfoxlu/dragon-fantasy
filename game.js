@@ -25,6 +25,7 @@ const ui = {
   xpNeed: document.getElementById('xpNeed'),
   kills: document.getElementById('kills'),
   time: document.getElementById('time'),
+  hpFill: document.getElementById('hpFill'),
   musicBtn: document.getElementById('musicBtn'),
   langBtn: document.getElementById('langBtn'),
   start: document.getElementById('start'),
@@ -2427,13 +2428,17 @@ function draw() {
     const f = player.moving ? (Math.floor(player.anim * 10) % 4) : 0;
     drawSprite(SPR.hero[player.dir][f], sx, sy, { scale: 1, alpha });
 
-    // HP bar above hero
+    // HP bar above hero (make it very visible)
     const hp01 = clamp(player.hp / player.hpMax, 0, 1);
-    const barW = 36;
-    ctx.fillStyle = 'rgba(0,0,0,.45)';
-    ctx.fillRect(sx - barW / 2, sy - 34, barW, 5);
-    ctx.fillStyle = `rgba(${Math.round(80 + 175 * (1 - hp01))}, ${Math.round(200 * hp01)}, 90, .95)`;
-    ctx.fillRect(sx - barW / 2, sy - 34, barW * hp01, 5);
+    const barW = 46;
+    const barH = 7;
+    const by = sy - 36;
+    ctx.fillStyle = 'rgba(0,0,0,.65)';
+    ctx.fillRect(sx - barW / 2, by, barW, barH);
+    ctx.strokeStyle = 'rgba(255,255,255,.22)';
+    ctx.strokeRect(sx - barW / 2, by, barW, barH);
+    ctx.fillStyle = `rgba(${Math.round(80 + 175 * (1 - hp01))}, ${Math.round(210 * hp01)}, 90, .98)`;
+    ctx.fillRect(sx - barW / 2, by, barW * hp01, barH);
 
     // forward aim indicator (subtle)
     const [nx, ny] = forwardVec(player.dir);
@@ -2554,7 +2559,10 @@ function draw() {
 }
 
 function updateUI() {
+  const hp01 = clamp(player.hp / player.hpMax, 0, 1);
   ui.hp.textContent = `${Math.max(0, player.hp | 0)} / ${player.hpMax}`;
+  if (ui.hpFill) ui.hpFill.style.width = `${Math.round(hp01 * 100)}%`;
+
   ui.level.textContent = String(player.level);
   ui.xp.textContent = String(player.xp | 0);
   ui.xpNeed.textContent = String(player.xpNeed);
