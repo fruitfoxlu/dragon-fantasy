@@ -2,6 +2,14 @@
 
 A tiny **Vampire Survivors-like** MVP you can run as a static webpage.
 
+## Author
+
+Royce Lu — fruitfoxlu@gmail.com
+
+## License
+
+FreeBSD (BSD 2-Clause) — see [LICENSE](LICENSE)
+
 ## Run
 
 Option 1 (double-click):
