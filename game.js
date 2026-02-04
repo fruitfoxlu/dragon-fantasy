@@ -19,6 +19,33 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 const IS_COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+// Viewport-aware, full-screen canvas sizing
+const view = { w: canvas.width, h: canvas.height, dpr: 1 };
+function resizeCanvas() {
+  const vv = window.visualViewport;
+  const cssW = Math.max(320, Math.floor((vv?.width || window.innerWidth || 960)));
+  const cssH = Math.max(240, Math.floor((vv?.height || window.innerHeight || 540)));
+  const dpr = clamp(window.devicePixelRatio || 1, 1, 3);
+
+  view.w = cssW;
+  view.h = cssH;
+  view.dpr = dpr;
+
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.floor(cssW * dpr);
+  canvas.height = Math.floor(cssH * dpr);
+
+  // Draw using CSS-pixel coordinates
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+}
+
+window.addEventListener('resize', () => resizeCanvas());
+window.visualViewport?.addEventListener('resize', () => resizeCanvas());
+window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
+resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const BUILD = 'v14';
 
@@ -905,7 +932,7 @@ function drawSprite(img, sx, sy, { scale = 1, rot = 0, alpha = 1 } = {}) {
 
 // ---------- input
 const keys = new Set();
-let mouse = { x: canvas.width / 2, y: canvas.height / 2, down: false };
+let mouse = { x: view.w / 2, y: view.h / 2, down: false };
 let paused = false;
 
 // balance knobs
@@ -937,8 +964,8 @@ window.addEventListener('keyup', (e) => keys.delete(e.code));
 
 canvas.addEventListener('mousemove', (e) => {
   const r = canvas.getBoundingClientRect();
-  mouse.x = ((e.clientX - r.left) / r.width) * canvas.width;
-  mouse.y = ((e.clientY - r.top) / r.height) * canvas.height;
+  mouse.x = ((e.clientX - r.left) / r.width) * view.w;
+  mouse.y = ((e.clientY - r.top) / r.height) * view.h;
 });
 canvas.addEventListener('mousedown', () => (mouse.down = true));
 canvas.addEventListener('mouseup', () => (mouse.down = false));
@@ -1182,7 +1209,7 @@ const toast = { text: '', t: 0 };
 function spawnEnemy() {
 
   const margin = 80;
-  const w = canvas.width, h = canvas.height;
+  const w = view.w, h = view.h;
   const side = (Math.random() * 4) | 0;
   let sx = 0, sy = 0;
   const px = player.x, py = player.y;
@@ -1275,7 +1302,7 @@ function spawnEnemy() {
 function spawnBoss() {
   // Big Boss: tougher, unique attacks, better loot.
   const margin = 120;
-  const w = canvas.width, h = canvas.height;
+  const w = view.w, h = view.h;
   const side = (Math.random() * 4) | 0;
   let sx = 0, sy = 0;
   const px = player.x, py = player.y;
@@ -2544,25 +2571,30 @@ function worldToScreen(x, y) {
   return [x - state.camera.x, y - state.camera.y];
 }
 
+function applyCanvasTransform() {
+  // Ensure DPR transform persists (some operations can reset it)
+  ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+}
+
 function draw() {
-  // camera: always keep player at canvas center.
-  // (Some in-app browsers report unreliable DOM layout rects which can push the camera off-screen.)
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2 + (IS_COARSE ? 56 : 0); // slight downward bias on phones
+  applyCanvasTransform();
+
+  // camera: always keep player at viewport center.
+  const centerX = view.w / 2;
+  const centerY = view.h / 2 + (IS_COARSE ? 56 : 0); // slight downward bias on phones
   state.viewCenter = { x: centerX, y: centerY };
 
   state.camera.x = player.x - centerX;
   state.camera.y = player.y - centerY;
 
-  ctx.imageSmoothingEnabled = false;
-
   // ---- pixel tile background (32x32)
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, view.w, view.h);
   const tileSize = 32;
   const startX = Math.floor(state.camera.x / tileSize) - 1;
   const startY = Math.floor(state.camera.y / tileSize) - 1;
-  const endX = Math.floor((state.camera.x + canvas.width) / tileSize) + 1;
-  const endY = Math.floor((state.camera.y + canvas.height) / tileSize) + 1;
+  const endX = Math.floor((state.camera.x + view.w) / tileSize) + 1;
+  const endY = Math.floor((state.camera.y + view.h) / tileSize) + 1;
 
   for (let ty = startY; ty <= endY; ty++) {
     for (let tx = startX; tx <= endX; tx++) {
@@ -2880,7 +2912,7 @@ function draw() {
   // overlays
   if (paused && state.mode === 'play') {
     ctx.fillStyle = 'rgba(0,0,0,.35)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, view.w, view.h);
     ctx.fillStyle = 'rgba(246,195,92,.92)';
     ctx.font = '20px system-ui';
     ctx.fillText('Paused (press P)', 18, 34);
@@ -2891,16 +2923,16 @@ function draw() {
     ctx.save();
     ctx.globalAlpha = clamp(toast.t / 2, 0, 1);
     ctx.fillStyle = 'rgba(0,0,0,.45)';
-    ctx.fillRect(16, canvas.height - 54, 360, 34);
+    ctx.fillRect(16, view.h - 54, 360, 34);
     ctx.fillStyle = 'rgba(246,195,92,.95)';
     ctx.font = '16px system-ui';
-    ctx.fillText(toast.text, 26, canvas.height - 30);
+    ctx.fillText(toast.text, 26, view.h - 30);
     ctx.restore();
   }
 
   if (state.mode === 'dead') {
     ctx.fillStyle = 'rgba(0,0,0,.62)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, view.w, view.h);
     ctx.fillStyle = 'rgba(246,195,92,.95)';
     ctx.font = '28px system-ui';
     ctx.fillText('Fallen Hero', 18, 44);
@@ -2912,8 +2944,8 @@ function draw() {
   // debug overlay (draw last so it stays visible)
   if (DEBUG) {
     try {
-      const cx = (state.viewCenter && state.viewCenter.x) ? state.viewCenter.x : (canvas.width / 2);
-      const cy = (state.viewCenter && state.viewCenter.y) ? state.viewCenter.y : (canvas.height / 2);
+      const cx = (state.viewCenter && state.viewCenter.x) ? state.viewCenter.x : (view.w / 2);
+      const cy = (state.viewCenter && state.viewCenter.y) ? state.viewCenter.y : (view.h / 2);
       const p = worldToScreen(player.x, player.y);
       const psx = p[0], psy = p[1];
 
@@ -2922,10 +2954,10 @@ function draw() {
 
       // Big visible label (draw near bottom so it won't be covered by the top HUD)
       ctx.fillStyle = 'rgba(0,0,0,.60)';
-      ctx.fillRect(10, canvas.height - 170, 170, 28);
+      ctx.fillRect(10, view.h - 170, 170, 28);
       ctx.fillStyle = 'rgba(255,255,255,.96)';
       ctx.font = '14px ui-monospace, Menlo, monospace';
-      ctx.fillText('DEBUG ON (v14)', 18, canvas.height - 150);
+      ctx.fillText('DEBUG ON (v14)', 18, view.h - 150);
 
       // red cross = screen center
       ctx.strokeStyle = 'rgba(255,80,80,.98)';
@@ -2957,7 +2989,7 @@ function draw() {
 
       // bottom single-line numbers
       ctx.fillStyle = 'rgba(0,0,0,.6)';
-      ctx.fillRect(10, canvas.height - 44, 520, 34);
+      ctx.fillRect(10, view.h - 44, 520, 34);
       ctx.fillStyle = 'rgba(255,255,255,.92)';
       ctx.font = '12px ui-monospace, Menlo, monospace';
       ctx.fillText(
@@ -2965,14 +2997,14 @@ function draw() {
         'screen=(' + psx.toFixed(1) + ',' + psy.toFixed(1) + ') ' +
         'cam=(' + state.camera.x.toFixed(1) + ',' + state.camera.y.toFixed(1) + ')',
         16,
-        canvas.height - 22
+        view.h - 22
       );
 
       // rolling log
       const boxW = 520;
       const boxH = 14 * (debugLog.length + 1);
       const x0 = 10;
-      const y0 = canvas.height - 44 - 10 - boxH;
+      const y0 = view.h - 44 - 10 - boxH;
       ctx.fillStyle = 'rgba(0,0,0,.55)';
       ctx.fillRect(x0, y0, boxW, boxH);
       ctx.fillStyle = 'rgba(255,255,255,.90)';
