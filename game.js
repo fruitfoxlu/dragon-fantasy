@@ -1424,9 +1424,11 @@ function updatePlayer(dt) {
     player.anim = 0;
   }
 
-  // keep player in sane world coords (helps some mobile browsers / negative drift)
-  player.x = clamp(player.x, 0, 999999);
-  player.y = clamp(player.y, 0, 999999);
+  // keep player in sane world coords but allow a HUGE map (effectively endless)
+  // (Bounds exist only to prevent NaN/overflow issues.)
+  const WBOUND = 120000;
+  player.x = clamp(player.x, -WBOUND, WBOUND);
+  player.y = clamp(player.y, -WBOUND, WBOUND);
 
   player.invuln = Math.max(0, player.invuln - dt);
 }
