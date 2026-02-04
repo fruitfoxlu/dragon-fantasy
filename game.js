@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v71';
+const BUILD = 'v72';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1098,6 +1098,17 @@ setSfxLabel();
 ui.sfxBtn?.addEventListener('click', () => {
   toggleSfx();
   try { localStorage.setItem('df_sfx', audio.sfxOn ? '1' : '0'); } catch {}
+});
+
+// Doom button no longer manually casts.
+// (Doom triggers only when 3 shards are collected.)
+ui.doomBtn?.addEventListener('click', () => {
+  toast.text = (lang === 'zh') ? '毀天滅地只能靠集碎片觸發（3/3 自動施放）' : 'Doom only triggers via shards (auto-cast at 3/3).';
+  toast.t = 1.2;
+});
+ui.doomTouchBtn?.addEventListener('click', () => {
+  toast.text = (lang === 'zh') ? '毀天滅地只能靠集碎片觸發（3/3 自動施放）' : 'Doom only triggers via shards (auto-cast at 3/3).';
+  toast.t = 1.2;
 });
 
 // init language (deferred until after state init to avoid ReferenceError)
