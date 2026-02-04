@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v111';
+const BUILD = 'v112';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -3383,7 +3383,7 @@ function openChest() {
   if (ui.levelup) ui.levelup.dataset.mode = 'chest';
   if (ui.modalTitle) ui.modalTitle.textContent = t('chestTitle');
 
-  const MAGIC_CAP = 10;
+  const MAGIC_CAP = 20;
   // Keep some surprise: Lightning + Dragon only appear from Lv15+
 
   const magicEnabled = (k) => weapons[k].enabled;
