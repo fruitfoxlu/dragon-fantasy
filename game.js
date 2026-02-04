@@ -1209,6 +1209,7 @@ const weapons = {
     baseCooldown: 1.1,
     damage: 20,
     chains: 3,
+    shots: 1,
     range: 190,
   },
 
@@ -1671,52 +1672,65 @@ function updateChainLightning(dt) {
   const w = weapons.lightning;
   if (!w.enabled) return;
 
+  // Highest level: effectively no cooldown
+  const minCd = 0.05;
+  const isMax = (w.shots >= 5 && w.chains >= 50);
+  const cdTarget = isMax ? minCd : Math.max(minCd, w.baseCooldown);
+
   w.cd -= dt;
   if (w.cd > 0) return;
 
-  const first = nearestEnemy();
-  if (!first) return;
+  const usedFirst = new Set();
+  let any = false;
 
-  const chain = [first];
-  for (let k = 1; k < w.chains; k++) {
-    const last = chain[chain.length - 1];
-    let best = null;
+  for (let s = 0; s < (w.shots || 1); s++) {
+    // pick a different first target each shot if possible
+    let first = null;
     let bestD = Infinity;
-
     for (const e of enemies) {
-      if (chain.includes(e)) continue;
-      const d = dist(last.x, last.y, e.x, e.y);
-      if (d <= w.range && d < bestD) {
-        best = e;
-        bestD = d;
+      if (usedFirst.has(e)) continue;
+      const d = dist(player.x, player.y, e.x, e.y);
+      if (d < bestD) { bestD = d; first = e; }
+    }
+    if (!first) break;
+    usedFirst.add(first);
+
+    const chain = [first];
+    for (let k = 1; k < w.chains; k++) {
+      const last = chain[chain.length - 1];
+      let best = null;
+      let bestCd = Infinity;
+      for (const e of enemies) {
+        if (chain.includes(e)) continue;
+        const d = dist(last.x, last.y, e.x, e.y);
+        if (d <= w.range && d < bestCd) {
+          best = e;
+          bestCd = d;
+        }
       }
+      if (!best) break;
+      chain.push(best);
     }
 
-    if (!best) break;
-    chain.push(best);
+    const pts = [[player.x, player.y]];
+    for (const e of chain) pts.push([e.x, e.y]);
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (!chain.includes(e)) continue;
+      damageEnemy(e, w.damage);
+      const [nx, ny] = norm(e.x - player.x, e.y - player.y);
+      e.vx += nx * 60;
+      e.vy += ny * 60;
+      if (e.hp <= 0) killEnemyAt(i);
+    }
+
+    effects.push({ type: 'bolt', pts, t: 0, ttl: 0.16 });
+    any = true;
   }
 
-  // apply damage (and build a polyline for visuals)
-  const pts = [[player.x, player.y]];
-  for (const e of chain) {
-    pts.push([e.x, e.y]);
-  }
-
-  // damage (iterate enemies array to handle kill)
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    const e = enemies[i];
-    if (!chain.includes(e)) continue;
-    damageEnemy(e, w.damage);
-    // tiny zap knockback
-    const [nx, ny] = norm(e.x - player.x, e.y - player.y);
-    e.vx += nx * 60;
-    e.vy += ny * 60;
-    if (e.hp <= 0) killEnemyAt(i);
-  }
-
-  sfxCast('lightning');
-  effects.push({ type: 'bolt', pts, t: 0, ttl: 0.16 });
-  w.cd = w.baseCooldown;
+  if (any) sfxCast('lightning');
+  w.cd = cdTarget;
 }
 
 function spawnMeteor() {
@@ -1797,8 +1811,8 @@ function castFrostShockwave() {
   sfxCast('frost');
   const [fx, fy] = forwardVec(player.dir);
   const baseAng = Math.PI / 3; // 60°
-  const stepAng = Math.PI / 6; // +30° per frost level
-  const coneAng = clamp(baseAng + Math.max(0, (w.lvl - 1)) * stepAng, baseAng, Math.PI * 2);
+  const stepAng = Math.PI / 12; // +15° per frost level
+  const coneAng = clamp(baseAng + Math.max(0, (w.lvl - 1)) * stepAng, baseAng, Math.PI / 2); // cap 90°
 
   effects.push({
     type: 'cone',
@@ -2635,9 +2649,26 @@ const UPGRADE_POOL = [
   },
   {
     id: 'lightning_chain',
-    title: '雷電鏈：跳躍次數 +1',
+    title: '雷電鏈：跳躍次數 +10（上限 50）',
     desc: '命中更多目標。',
-    apply() { weapons.lightning.chains += 1; weapons.lightning.lvl += 1; }
+    apply() { weapons.lightning.chains = Math.min(50, weapons.lightning.chains + 10); weapons.lightning.lvl += 1; }
+  },
+  {
+    id: 'lightning_shots',
+    title: '雷電鏈：同時放電 +1（上限 5）',
+    desc: '一次放出更多條雷電鏈。',
+    apply() { weapons.lightning.shots = Math.min(5, (weapons.lightning.shots || 1) + 1); weapons.lightning.lvl += 1; }
+  },
+  {
+    id: 'lightning_nocd',
+    title: '雷電鏈：究極（無冷卻）',
+    desc: '達成 5 條 + 50 跳躍後，冷卻幾乎為 0。',
+    apply() {
+      weapons.lightning.shots = 5;
+      weapons.lightning.chains = 50;
+      weapons.lightning.baseCooldown = 0.05;
+      weapons.lightning.lvl += 1;
+    }
   },
   {
     id: 'lightning_dmg',
@@ -3595,7 +3626,8 @@ function resetRun() {
   weapons.lightning.lvl = 0;
   weapons.lightning.baseCooldown = 1.1;
   weapons.lightning.damage = 20;
-  weapons.lightning.chains = 6;
+  weapons.lightning.chains = 3;
+  weapons.lightning.shots = 1;
   weapons.lightning.range = 190;
   weapons.lightning.cd = 0;
 
