@@ -1212,7 +1212,7 @@ const weapons = {
     enabled: false,
     lvl: 0,
     crosses: 3,
-    radius: 330,
+    radius: 90,
     crossSize: 42,
     damage: 120,
     tick: 0.18,
@@ -1768,7 +1768,7 @@ function updateDragonSoul(dt) {
 
   for (let i = 0; i < w.crosses; i++) {
     const baseAng = w.ang + i * (Math.PI * 2 / w.crosses);
-    const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 18;
+    const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 14;
     const cx = player.x + Math.cos(baseAng) * rad;
     const cy = player.y + Math.sin(baseAng) * rad;
 
@@ -2771,7 +2771,7 @@ function draw() {
     const w = weapons.dragon;
     for (let i = 0; i < w.crosses; i++) {
       const ang = w.ang + i * (Math.PI * 2 / w.crosses);
-      const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * (18 * 3);
+      const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 14;
       const bx = player.x + Math.cos(ang) * rad;
       const by = player.y + Math.sin(ang) * rad;
       const [sx, sy] = worldToScreen(bx, by);
