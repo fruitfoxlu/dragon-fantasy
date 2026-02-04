@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v80';
+const BUILD = 'v81';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1124,7 +1124,7 @@ const state = {
 
   nextBossAt: 360,
 
-  doomShards: 0, // collect 3 shards to cast once
+  doomShards: 0, // collect 6 shards to cast once
   doomLockT: 0,
   spawnPauseT: 0,
 
@@ -1294,6 +1294,13 @@ const enemyBullets = [];  // enemy bullets  {x,y,vx,vy,r, dmg, life}
 const enemies = [];       // {x,y,r, hp, speed, touchDmg, vx,vy, frozenUntil, burnUntil, burnDps, bladeHitCd, type, elite, shootCd, shootBase, shootSpeed, shootDmg}
 const gems = [];          // {x,y,r, xp}
 const chests = [];        // {x,y,r}
+
+function pushChest(x, y, r=12) {
+  // hard cap: max 4 chests on the map
+  if (chests.length >= 4) return false;
+  chests.push({ x, y, r });
+  return true;
+}
 const slotOrbs = [];      // {x,y,r}
 const vacuumGems = [];    // {x,y,r}
 const heals = [];         // {x,y,r, amount}
@@ -1688,7 +1695,7 @@ function killEnemyAt(index) {
     sfxPickup('reward');
     const chestMul = e.purpleBoss ? 2 : 1;
     for (let k = 0; k < 3 * chestMul; k++) {
-      chests.push({ x: e.x + rand(-22, 22), y: e.y + rand(-22, 22), r: 12 });
+      pushChest(e.x + rand(-22, 22), e.y + rand(-22, 22), 12);
     }
     for (let k = 0; k < 10; k++) {
       gems.push({ x: e.x + rand(-28, 28), y: e.y + rand(-28, 28), r: 6, xp: baseXp * 2 });
@@ -1700,8 +1707,8 @@ function killEnemyAt(index) {
   } else if (e.elite) {
     // Elite: guaranteed chest + extra chance.
     sfxPickup('reward');
-    chests.push({ x: e.x, y: e.y, r: 12 });
-    if (Math.random() < 0.35) chests.push({ x: e.x + rand(-14, 14), y: e.y + rand(-14, 14), r: 12 });
+    pushChest(e.x, e.y, 12);
+    if (Math.random() < 0.35) pushChest(e.x + rand(-14, 14), e.y + rand(-14, 14), 12);
 
     // Elite bonus drops: slot-orb only if not maxed; otherwise redistribute odds.
     const roll = Math.random();
@@ -2106,8 +2113,8 @@ function doomStrike(free=false) {
   if ((state.doomLockT || 0) > 0) return;
 
   if (!free) {
-    if ((state.doomShards || 0) < 3) return;
-    state.doomShards -= 3;
+    if ((state.doomShards || 0) < 6) return;
+    state.doomShards -= 6;
   }
 
   // lock to prevent accidental re-trigger in the same moment
@@ -2527,17 +2534,17 @@ function updateDoomOrbs(dt) {
       state.doomShards = (state.doomShards || 0) + 1;
       sfxPickup('reward');
 
-      const c = state.doomShards % 3;
+      const c = state.doomShards % 6;
       if (c === 0) {
-        // auto-cast when reaching 3 shards, then reset
+        // auto-cast when reaching 6 shards, then reset
         state.doomShards = 0;
-        toast.text = (lang === 'zh') ? '集滿 3 個碎片！自動施放毀天滅地！' : '3 shards collected! Auto-casting DOOM!';
+        toast.text = (lang === 'zh') ? '集滿 6 個碎片！自動施放毀天滅地！' : '6 shards collected! Auto-casting DOOM!';
         toast.t = 2.0;
         doomStrike(true);
         return;
       }
 
-      toast.text = (lang === 'zh') ? `毀天碎片 +1（${c}/3）` : `Doom Shard +1 (${c}/3)`;
+      toast.text = (lang === 'zh') ? `毀天碎片 +1（${c}/6）` : `Doom Shard +1 (${c}/6)`;
       toast.t = 2.0;
       return;
     }
@@ -2797,13 +2804,13 @@ const CHEST_POOL = [
     id: 'chest_doom',
     title: {
       zh: () => {
-        const rem = 3 - ((state.doomShards || 0) % 3);
-        const missing = (rem === 3) ? 0 : rem;
+        const rem = 6 - ((state.doomShards || 0) % 6);
+        const missing = (rem === 6) ? 0 : rem;
         return `毀天碎片：+1（還缺 ${missing} 片）`;
       },
       en: () => {
-        const rem = 3 - ((state.doomShards || 0) % 3);
-        const missing = (rem === 3) ? 0 : rem;
+        const rem = 6 - ((state.doomShards || 0) % 6);
+        const missing = (rem === 6) ? 0 : rem;
         return `Doom Shard: +1 (${missing} to go)`;
       }
     },
@@ -3950,9 +3957,9 @@ function updateUI() {
 
   if (ui.doomBtn || ui.doomTouchBtn) {
     const shards = (state.doomShards || 0);
-    const ready = Math.floor(shards / 3);
-    const rem = shards % 3;
-    const label = (ready > 0) ? `Doom: ${ready} (${rem}/3)` : `Doom: ${rem}/3`;
+    const ready = Math.floor(shards / 6);
+    const rem = shards % 6;
+    const label = (ready > 0) ? `Doom: ${ready} (${rem}/6)` : `Doom: ${rem}/6`;
     if (ui.doomBtn) ui.doomBtn.textContent = label;
     if (ui.doomTouchBtn) ui.doomTouchBtn.textContent = label;
   }
