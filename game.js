@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v116';
+const BUILD = 'v117';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1560,7 +1560,7 @@ function spawnEnemy() {
 
   if (elite) {
     r *= 5.0;
-    hp *= 15.0; // 5x tougher than before (was 3.0)
+    hp *= 45.0; // 3x more elite HP
     speed *= 0.70;
   }
 
@@ -1627,7 +1627,7 @@ function spawnBoss() {
     x: sx,
     y: sy,
     r: mega ? 88 : 44, // 2x size
-    hp: bossHpBase * 2 * (purple ? 2 : 1) * (mega ? 3 : 1), // base boss doubled; mega boss 3x tougher
+    hp: bossHpBase * 2 * (purple ? 2 : 1) * (mega ? 3 : 1) * 3, // 3x boss HP
     speed: mega ? 82 : 95,
     touchDmg: mega ? 38 : 28,
     vx: 0,
@@ -1668,7 +1668,7 @@ function spawnFinalBoss() {
     x: sx,
     y: sy,
     r: rr,
-    hp: 18000,
+    hp: 54000,
     speed: 72,
     touchDmg: 48,
     vx: 0,
@@ -3138,12 +3138,6 @@ const UPGRADE_POOL = [
     apply() { weapons.dragon.angSpeed *= 1.45; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
   {
-    id: 'dragon_speed_3',
-    title: '龍魂：轉速提升（快→很快）',
-    desc: '幾乎貼身旋轉。',
-    apply() { weapons.dragon.angSpeed *= 1.45; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
-  },
-  {
     id: 'dragon_more_3',
     title: '龍魂：數量 +1（6已滿）',
     desc: '（已達上限）',
@@ -3160,6 +3154,80 @@ const UPGRADE_POOL = [
     title: '龍魂：數量 +1（6已滿）',
     desc: '（已達上限）',
     apply() { weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+
+  // Dragon Soul (extend beyond Lv5; up to magic cap)
+  {
+    id: 'dragon_speed_5',
+    title: '龍魂：轉速提升（爆快→暴風）',
+    desc: '更密集掃場，並小幅提升傷害。',
+    apply() { weapons.dragon.angSpeed *= 1.25; weapons.dragon.damage = Math.round(weapons.dragon.damage * 1.10); weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_more_5',
+    title: '龍魂：數量 / 威力提升',
+    desc: '若十字未滿 10：+1；否則：傷害 +15%。',
+    apply() { if ((weapons.dragon.crosses||0) < 10) weapons.dragon.crosses += 1; else weapons.dragon.damage = Math.round(weapons.dragon.damage * 1.15); weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_speed_6',
+    title: '龍魂：轉速提升（暴風→颶風）',
+    desc: '更快轉，並增加範圍。',
+    apply() { weapons.dragon.angSpeed *= 1.22; weapons.dragon.radius = Math.round((weapons.dragon.radius||120) * 1.08); weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_more_6',
+    title: '龍魂：數量 / 威力提升',
+    desc: '若十字未滿 10：+1；否則：傷害 +15%。',
+    apply() { if ((weapons.dragon.crosses||0) < 10) weapons.dragon.crosses += 1; else weapons.dragon.damage = Math.round(weapons.dragon.damage * 1.15); weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_speed_7',
+    title: '龍魂：轉速提升（颶風→龍捲）',
+    desc: '更快、更穩。',
+    apply() { weapons.dragon.angSpeed *= 1.18; weapons.dragon.jitter = Math.max(0.15, (weapons.dragon.jitter||0.45) * 0.90); weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_more_7',
+    title: '龍魂：數量 / 威力提升',
+    desc: '若十字未滿 10：+1；否則：傷害 +15%。',
+    apply() { if ((weapons.dragon.crosses||0) < 10) weapons.dragon.crosses += 1; else weapons.dragon.damage = Math.round(weapons.dragon.damage * 1.15); weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_speed_8',
+    title: '龍魂：轉速提升（龍捲→神速）',
+    desc: '最後的加速段。',
+    apply() { weapons.dragon.angSpeed *= 1.15; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_more_8',
+    title: '龍魂：威力提升',
+    desc: '傷害 +18%。',
+    apply() { weapons.dragon.damage = Math.round(weapons.dragon.damage * 1.18); weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_speed_9',
+    title: '龍魂：轉速提升（神速→極限）',
+    desc: '再加速一段。',
+    apply() { weapons.dragon.angSpeed *= 1.12; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_more_9',
+    title: '龍魂：威力提升',
+    desc: '傷害 +18%。',
+    apply() { weapons.dragon.damage = Math.round(weapons.dragon.damage * 1.18); weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_speed_10',
+    title: '龍魂：轉速提升（極限→超越）',
+    desc: '超越極限。',
+    apply() { weapons.dragon.angSpeed *= 1.10; weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_more_10',
+    title: '龍魂：威力提升',
+    desc: '傷害 +20%。',
+    apply() { weapons.dragon.damage = Math.round(weapons.dragon.damage * 1.20); weapons.dragon.stage += 1; weapons.dragon.lvl += 1; }
   },
 
   // Wand
