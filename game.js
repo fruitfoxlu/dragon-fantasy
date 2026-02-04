@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v114';
+const BUILD = 'v115';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -3761,62 +3761,103 @@ function draw() {
   }
 
   // Biome: snowland transition (starts at Lv15, fades in over ~80s)
+  // Make it VERY visible: stronger tint + snowy patches + drifting flakes.
   if (state.snowStartAt != null) {
     const p = clamp((state.elapsed - state.snowStartAt) / 80, 0, 1);
 
-    // cool tint overlay
+    // strong cool tint
     ctx.save();
-    ctx.globalAlpha = 0.08 + 0.22 * p;
-    ctx.fillStyle = '#cfe6ff';
+    ctx.globalAlpha = 0.12 + 0.38 * p;
+    ctx.fillStyle = '#d9f0ff';
     ctx.fillRect(0, 0, view.w, view.h);
 
-    // light frost speckles (tile-stable)
-    ctx.globalAlpha = 0.10 + 0.22 * p;
-    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    // snowy patches (3x3 tiles) using coarse noise
+    ctx.globalAlpha = 0.14 + 0.30 * p;
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    for (let ty = startY; ty <= endY; ty++) {
+      for (let tx = startX; tx <= endX; tx++) {
+        const hh = hash2((tx/3)|0, (ty/3)|0);
+        if ((hh & 31) === 0) {
+          const sx0 = (tx * tileSize) - state.camera.x;
+          const sy0 = (ty * tileSize) - state.camera.y;
+          ctx.fillRect(sx0, sy0, tileSize, tileSize);
+        }
+      }
+    }
+
+    // frost speckles
+    ctx.globalAlpha = 0.10 + 0.28 * p;
+    ctx.fillStyle = 'rgba(255,255,255,.95)';
     for (let ty = startY; ty <= endY; ty++) {
       for (let tx = startX; tx <= endX; tx++) {
         const h = hash2(tx, ty);
-        if ((h & 7) === 0) {
+        if ((h & 3) === 0) {
           const sx = tx * tileSize - state.camera.x + ((h >>> 8) & 15);
           const sy = ty * tileSize - state.camera.y + ((h >>> 12) & 15);
           ctx.fillRect(sx, sy, 2, 2);
         }
       }
     }
+
+    // drifting flakes (screen-space, subtle motion)
+    ctx.globalAlpha = 0.10 + 0.18 * p;
+    ctx.fillStyle = 'rgba(255,255,255,.90)';
+    const flN = Math.floor(80 * p);
+    for (let i = 0; i < flN; i++) {
+      const x = (i * 97 + Math.floor(state.elapsed * 22)) % (view.w + 60) - 30;
+      const y = (i * 53 + Math.floor(state.elapsed * 38)) % (view.h + 60) - 30;
+      ctx.fillRect(x, y, 2, 2);
+    }
+
     ctx.restore();
   }
 
   // Biome: lava / geothermal transition (starts at Lv30, fades in over ~85s)
+  // Make it VERY visible: warm tint + cracks + stronger vignette + embers.
   if (state.lavaStartAt != null) {
     const p = clamp((state.elapsed - state.lavaStartAt) / 85, 0, 1);
 
-    // warm tint overlay (keep readable; avoid pure red)
     ctx.save();
-    ctx.globalAlpha = 0.06 + 0.24 * p;
-    ctx.fillStyle = '#ff7a3a';
+
+    // warm tint overlay
+    ctx.globalAlpha = 0.10 + 0.42 * p;
+    ctx.fillStyle = '#ff5a2a';
     ctx.fillRect(0, 0, view.w, view.h);
 
-    // dark-violet vignette for depth
-    ctx.globalAlpha = 0.05 + 0.18 * p;
-    const vg = ctx.createRadialGradient(view.w/2, view.h/2, 80, view.w/2, view.h/2, Math.max(view.w, view.h) * 0.7);
+    // heavy vignette
+    ctx.globalAlpha = 0.10 + 0.35 * p;
+    const vg = ctx.createRadialGradient(view.w/2, view.h/2, 40, view.w/2, view.h/2, Math.max(view.w, view.h) * 0.8);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(40,0,60,0.55)');
+    vg.addColorStop(1, 'rgba(25,0,35,0.80)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, view.w, view.h);
 
-    // embers (tile-stable)
-    ctx.globalAlpha = 0.10 + 0.22 * p;
+    // lava cracks (tile-stable glow lines)
+    ctx.globalAlpha = 0.08 + 0.28 * p;
+    ctx.strokeStyle = 'rgba(255,210,80,.85)';
+    ctx.lineWidth = 2;
     for (let ty = startY; ty <= endY; ty++) {
       for (let tx = startX; tx <= endX; tx++) {
         const h = hash2(tx, ty);
-        if ((h & 15) === 0) {
-          const sx = tx * tileSize - state.camera.x + ((h >>> 6) & 31);
-          const sy = ty * tileSize - state.camera.y + ((h >>> 11) & 31);
-          const r = 1 + ((h >>> 18) & 1);
-          ctx.fillStyle = ((h >>> 20) & 1) ? 'rgba(255,170,70,.90)' : 'rgba(255,80,40,.85)';
-          ctx.fillRect(sx, sy, r, r);
+        if ((h & 63) === 0) {
+          const sx = tx * tileSize - state.camera.x;
+          const sy = ty * tileSize - state.camera.y;
+          ctx.beginPath();
+          ctx.moveTo(sx + 4, sy + 6 + ((h>>>8)&7));
+          ctx.lineTo(sx + 28, sy + 26 - ((h>>>12)&7));
+          ctx.stroke();
         }
       }
+    }
+    ctx.lineWidth = 1;
+
+    // embers
+    ctx.globalAlpha = 0.10 + 0.28 * p;
+    for (let i = 0; i < Math.floor(90 * p); i++) {
+      const x = (i * 83 + Math.floor(state.elapsed * 60)) % (view.w + 80) - 40;
+      const y = (i * 41 + Math.floor(state.elapsed * 28)) % (view.h + 80) - 40;
+      ctx.fillStyle = (i & 1) ? 'rgba(255,190,80,.90)' : 'rgba(255,90,40,.85)';
+      ctx.fillRect(x, y, 2, 2);
     }
 
     ctx.restore();
