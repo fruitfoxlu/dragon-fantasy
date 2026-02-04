@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v103';
+const BUILD = 'v104';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -3388,7 +3388,7 @@ function openChest() {
   if (ui.modalTitle) ui.modalTitle.textContent = t('chestTitle');
 
   const MAGIC_CAP = 10;
-  const gates = { meteor: 5, frost: 10, lightning: 15, dragon: 20 };
+  // No level gates for spells: any spell can appear from chests at any time.
 
   const magicEnabled = (k) => weapons[k].enabled;
   const magicLvl = (k) => (weapons[k].lvl || 0);
@@ -3406,11 +3406,6 @@ function openChest() {
     );
     if (!isMagic) return false;
 
-    // gate by level
-    if ((id === 'unlock_meteor' || id.startsWith('meteor_')) && player.level < gates.meteor) return false;
-    if ((id === 'unlock_frost' || id.startsWith('frost_')) && player.level < gates.frost) return false;
-    if ((id === 'unlock_lightning' || id.startsWith('lightning_')) && player.level < gates.lightning) return false;
-    if ((id === 'unlock_dragon' || id.startsWith('dragon_')) && player.level < gates.dragon) return false;
 
     // unlock only if not enabled
     if (id === 'unlock_meteor') return !weapons.meteor.enabled;
