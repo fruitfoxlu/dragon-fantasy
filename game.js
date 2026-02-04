@@ -1679,10 +1679,11 @@ function updateDragonSoul(dt) {
   }
 
   for (let i = 0; i < w.crosses; i++) {
-    const baseAng = w.ang + i * (Math.PI * 2 / w.crosses);
-    const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 14;
-    const cx = player.x + Math.cos(baseAng) * rad;
-    const cy = player.y + Math.sin(baseAng) * rad;
+    const u = w.ang + i * (Math.PI * 2 / w.crosses);
+    const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 10;
+    // Lemniscate / infinity path (Gerono): x=a*sin(t), y=b*sin(2t)
+    const cx = player.x + Math.sin(u) * rad;
+    const cy = player.y + Math.sin(2 * u) * rad * 0.55;
 
     // damage enemies in a small AoE around cross
     for (let ei = enemies.length - 1; ei >= 0; ei--) {
@@ -2043,6 +2044,10 @@ function updateEffects(dt) {
 
     if (fx.type === 'cone') {
       const w = weapons.frost;
+      // follow player position while the cone expands
+      fx.x = player.x;
+      fx.y = player.y;
+
       const t01 = clamp(fx.t / fx.ttl, 0, 1);
       const r = fx.r0 + (fx.r1 - fx.r0) * t01;
       const band = 14;
@@ -2729,12 +2734,12 @@ function draw() {
   if (weapons.dragon.enabled) {
     const w = weapons.dragon;
     for (let i = 0; i < w.crosses; i++) {
-      const ang = w.ang + i * (Math.PI * 2 / w.crosses);
-      const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 14;
-      const bx = player.x + Math.cos(ang) * rad;
-      const by = player.y + Math.sin(ang) * rad;
+      const u = w.ang + i * (Math.PI * 2 / w.crosses);
+      const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 10;
+      const bx = player.x + Math.sin(u) * rad;
+      const by = player.y + Math.sin(2 * u) * rad * 0.55;
       const [sx, sy] = worldToScreen(bx, by);
-      drawSprite(SPR.dragonCross, sx, sy, { scale: 1.0, rot: ang, alpha: 0.95 });
+      drawSprite(SPR.dragonCross, sx, sy, { scale: 1.0, rot: u, alpha: 0.95 });
     }
   }
 
