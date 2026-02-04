@@ -1117,6 +1117,7 @@ const state = {
   // level-up pacing
   pendingLevelUps: 0,
   lastLevelUpAt: -999,
+  choiceLock: false,
 };
 
 const player = {
@@ -2727,7 +2728,8 @@ let currentChoices = [];
 let pendingWeaponUnlock = null;
 
 function openLevelUp() {
-  openChoiceModal('levelup', t('levelUpTitle'), UPGRADE_POOL);
+  const extra = state.pendingLevelUps > 0 ? (lang === 'zh' ? `（連升剩 ${state.pendingLevelUps}）` : ` (+${state.pendingLevelUps} queued)`) : '';
+  openChoiceModal('levelup', t('levelUpTitle') + extra, UPGRADE_POOL);
 }
 
 function openChest() {
@@ -2801,6 +2803,7 @@ function tryEnableWeapon(key) {
 
 function openChoiceModal(mode, title, poolBase) {
   state.mode = mode;
+  state.choiceLock = false;
   paused = true;
   if (ui.modalTitle) ui.modalTitle.textContent = title;
 
@@ -2884,8 +2887,10 @@ function openChoiceModal(mode, title, poolBase) {
 
 function chooseUpgrade(idx) {
   if (state.mode !== 'levelup' && state.mode !== 'chest' && state.mode !== 'replace') return;
+  if (state.choiceLock) return;
+  state.choiceLock = true;
   const u = currentChoices[idx];
-  if (!u) return;
+  if (!u) { state.choiceLock = false; return; }
   u.apply();
   ui.levelup.classList.add('hidden');
   state.mode = 'play';
