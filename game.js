@@ -1251,7 +1251,7 @@ function spawnEnemy() {
 
   if (elite) {
     r *= 5.0;
-    hp *= 3.0;
+    hp *= 15.0; // 5x tougher than before (was 3.0)
     speed *= 0.70;
   }
 
@@ -1304,7 +1304,7 @@ function spawnBoss() {
     x: sx,
     y: sy,
     r: 44,
-    hp: 1200 + state.elapsed * 3.2,
+    hp: (1200 + state.elapsed * 3.2) * 5,
     speed: 95,
     touchDmg: 28,
     vx: 0,
@@ -3218,8 +3218,10 @@ function loop(now) {
 
     while (enemySpawnAcc > spawnRate) {
       enemySpawnAcc -= spawnRate;
+      // double (actually ~2x) mob count
       spawnEnemy();
-      if (Math.random() < 0.15) spawnEnemy();
+      spawnEnemy();
+      if (Math.random() < 0.30) spawnEnemy();
     }
 
     // Boss spawn
@@ -3364,7 +3366,7 @@ function startGame() {
   state.mode = 'play';
   paused = false;
 
-  for (let i = 0; i < 6; i++) spawnEnemy();
+  for (let i = 0; i < 12; i++) spawnEnemy();
   requestAnimationFrame(loop);
 }
 
