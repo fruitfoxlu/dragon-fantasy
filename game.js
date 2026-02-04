@@ -2301,6 +2301,22 @@ function openChoiceModal(mode, title, poolBase) {
 
   currentChoices = [];
   const used = new Set();
+
+  // Guarantee: every LEVEL UP includes at least one elemental magic option.
+  // Magic = Fire (meteor), Ice (frost), Lightning (chain lightning).
+  if (mode === 'levelup') {
+    const magicPool = pool.filter(u => (
+      u.id === 'unlock_meteor' || u.id.startsWith('meteor_') ||
+      u.id === 'unlock_frost' || u.id.startsWith('frost_') ||
+      u.id === 'unlock_lightning' || u.id.startsWith('lightning_')
+    ));
+    if (magicPool.length) {
+      const m = pick(magicPool);
+      used.add(m.id);
+      currentChoices.push(m);
+    }
+  }
+
   while (currentChoices.length < 3 && used.size < pool.length) {
     const u = pick(pool);
     if (used.has(u.id)) continue;
@@ -2768,16 +2784,16 @@ function resetRun() {
   weapons.lightning.enabled = false;
   weapons.lightning.baseCooldown = 1.1;
   weapons.lightning.damage = 20;
-  weapons.lightning.chains = 3;
+  weapons.lightning.chains = 6;
   weapons.lightning.range = 190;
   weapons.lightning.cd = 0;
 
   weapons.meteor.enabled = false;
   weapons.meteor.baseCooldown = 2.4;
-  weapons.meteor.impactDamage = 44;
+  weapons.meteor.impactDamage = 88;
   weapons.meteor.impactRadius = 90;
   weapons.meteor.burnRadius = 80;
-  weapons.meteor.burnDps = 16;
+  weapons.meteor.burnDps = 32;
   weapons.meteor.burnDuration = 2.6;
   weapons.meteor.delay = 0.6;
   weapons.meteor.scatter = 320;
