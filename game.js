@@ -1251,10 +1251,10 @@ function spawnEnemy() {
   }
 
   if (big) {
-    // big brute: 2x size, 2x HP, 2x speed
+    // big brute: 2x size, 2x HP, slower than the current big (half its previous speed)
     r *= 2.0;
     hp *= 2.0;
-    speed *= 2.0;
+    speed *= 1.0;
     // force melee so it feels distinct
     type = 'melee';
   }
@@ -2820,6 +2820,16 @@ function draw() {
 
     // Elite visual: add a golden helmet overlay + glowing eyes
     drawSprite(base[e.dir][f], sx, sy, { scale, alpha });
+
+    // Big brute visual: red tint overlay (easy to distinguish)
+    if (e.big && !frozen) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = 'rgb(220,60,60)';
+      ctx.fillRect(sx - 24 * scale/2, sy - 28 * scale/2, 48 * scale/2, 56 * scale/2);
+      ctx.restore();
+    }
     if (e.elite && !frozen) {
       ctx.save();
       ctx.imageSmoothingEnabled = false;
