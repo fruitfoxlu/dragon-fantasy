@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v74';
+const BUILD = 'v75';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1606,15 +1606,16 @@ function spawnBoss() {
   if (side === 3) { sx = px - w / 2 - margin; sy = py + rand(-h / 2, h / 2); }
 
   const purple = Math.random() < 0.35;
+  const mega = Math.random() < 0.18; // new bigger boss variant
   const bossHpBase = (1200 + state.elapsed * 3.2) * 5;
 
   const boss = {
     x: sx,
     y: sy,
-    r: 44,
-    hp: bossHpBase * (purple ? 2 : 1),
-    speed: 95,
-    touchDmg: 28,
+    r: mega ? 88 : 44, // 2x size
+    hp: bossHpBase * 2 * (purple ? 2 : 1) * (mega ? 3 : 1), // base boss doubled; mega boss 3x tougher
+    speed: mega ? 82 : 95,
+    touchDmg: mega ? 38 : 28,
     vx: 0,
     vy: 0,
     frozenUntil: 0,
@@ -1625,6 +1626,7 @@ function spawnBoss() {
     type: 'boss',
     elite: true,
     purpleBoss: purple,
+    megaBoss: mega,
     dir: 0,
     anim: 0,
 
@@ -2304,20 +2306,24 @@ function updateEnemies(dt) {
             e.slamWindup -= dt;
             if (e.slamWindup <= 0) {
               // slam: damaging shock ring around boss
-              effects.push({ type: 'boss_slam', x: e.x, y: e.y, t: 0, ttl: 0.45, radius: 170 });
-              e.slamCd = 6.5;
+              const rr = e.megaBoss ? 240 : 170;
+              effects.push({ type: 'boss_slam', x: e.x, y: e.y, t: 0, ttl: 0.45, radius: rr });
+              e.slamCd = e.megaBoss ? 7.2 : 6.5;
             }
           } else if (e.chargeCd <= 0 && d < 520) {
             // charge with short tell
             effects.push({ type: 'boss_tell', x: e.x, y: e.y, t: 0, ttl: 0.55, dx, dy });
             const [cx, cy] = norm(dx, dy);
-            e.chargeVx = cx * 520;
-            e.chargeVy = cy * 520;
-            e.chargeT = 0.55;
+            const sp = e.megaBoss ? 620 : 520;
+            const tt = e.megaBoss ? 0.65 : 0.55;
+            e.chargeVx = cx * sp;
+            e.chargeVy = cy * sp;
+            e.chargeT = tt;
             e.chargeCd = 4.2;
           } else if (e.slamCd <= 0 && d < 260) {
             // slam windup
-            effects.push({ type: 'boss_slam_warn', x: e.x, y: e.y, t: 0, ttl: 0.55, radius: 170 });
+            const rr = e.megaBoss ? 240 : 170;
+            effects.push({ type: 'boss_slam_warn', x: e.x, y: e.y, t: 0, ttl: 0.55, radius: rr });
             e.slamWindup = 0.55;
           } else if (e.summonCd <= 0) {
             // summon a small pack
