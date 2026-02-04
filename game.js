@@ -36,6 +36,10 @@ const ui = {
   joy: document.getElementById('joy'),
   joyKnob: document.querySelector('#joy .joyKnob'),
   pauseBtn: document.getElementById('pauseBtn'),
+
+  hudSlots: document.getElementById('hudSlots'),
+  hudWeapons: document.getElementById('hudWeapons'),
+  hudMagic: document.getElementById('hudMagic'),
 };
 
 // ---------- helpers
@@ -84,10 +88,12 @@ const I18N = {
 
     w_wand: 'Arcane Wand',
     w_bow: 'Dragon Bow',
+    w_holy: 'Holy Water',
     w_blades: 'Whirling Blades',
     w_lightning: 'Chain Lightning',
     w_meteor: 'Meteor',
     w_frost: 'Frost Shockwave',
+    w_dragon: 'Dragon Soul',
   },
   zh: {
     music: (on) => `音樂：${on ? '開' : '關'}`,
@@ -114,10 +120,12 @@ const I18N = {
 
     w_wand: '秘法魔杖',
     w_bow: '龍焰弓',
+    w_holy: '聖水',
     w_blades: '迴旋斬',
     w_lightning: '雷電鏈',
     w_meteor: '隕石術',
     w_frost: '冰凍衝擊波',
+    w_dragon: '龍魂',
   },
 };
 
@@ -695,6 +703,14 @@ const SPR = {
     outline(g, 5, 5, 6, 9, 'rgba(0,0,0,.35)');
   }),
 
+  dragonCross: makeSprite(20, 20, (g) => {
+    // bright cross
+    px(g, 9, 2, 2, 16, '#f6c35c');
+    px(g, 2, 9, 16, 2, '#7cf2d0');
+    px(g, 9, 9, 2, 2, '#fff6dc');
+    outline(g, 2, 2, 16, 16, 'rgba(0,0,0,.18)');
+  }),
+
   boneShot: makeSprite(10, 6, (g) => {
     px(g, 1, 2, 8, 2, '#e9e6dd');
     px(g, 0, 1, 2, 1, '#d6d1c4');
@@ -1013,9 +1029,13 @@ const player = {
 // weapon model:
 // - projectile types: kind auto|forward uses bullets
 // - special types implement their own firing in updateWeapons
+const WEAPON_KEYS = ['wand','bow','holy','blades'];
+const MAGIC_KEYS = ['lightning','frost','meteor','dragon'];
+
 const weapons = {
   wand: {
     name: 'Arcane Wand',
+    lvl: 1,
     kind: 'auto',
     enabled: true,
     cd: 0,
@@ -1028,6 +1048,7 @@ const weapons = {
   },
   bow: {
     name: 'Dragon Bow',
+    lvl: 0,
     kind: 'forward',
     enabled: false,
     cd: 0,
@@ -1039,8 +1060,21 @@ const weapons = {
     pierce: 1,
   },
 
+  holy: {
+    name: 'Holy Water',
+    kind: 'cardinal',
+    enabled: false,
+    lvl: 0,
+    cd: 0,
+    baseCooldown: 0.95,
+    damage: 14,
+    speed: 520,
+    pierce: 1,
+  },
+
   blades: {
     name: 'Whirling Blades',
+    lvl: 0,
     kind: 'orbit',
     enabled: false,
     cd: 0, // not used
@@ -1055,6 +1089,7 @@ const weapons = {
 
   lightning: {
     name: 'Chain Lightning',
+    lvl: 0,
     kind: 'chain',
     enabled: false,
     cd: 0,
@@ -1066,6 +1101,7 @@ const weapons = {
 
   meteor: {
     name: 'Meteor',
+    lvl: 0,
     kind: 'meteor',
     enabled: false,
     cd: 0,
@@ -1081,6 +1117,7 @@ const weapons = {
 
   frost: {
     name: 'Frost Shockwave',
+    lvl: 0,
     kind: 'ice',
     enabled: false,
     cd: 0,
@@ -1090,7 +1127,22 @@ const weapons = {
     knock: 280,
     maxRadius: 230,
     speed: 520, // expansion speed
-  }
+  },
+
+  dragon: {
+    name: 'Dragon Soul',
+    kind: 'cross',
+    enabled: false,
+    lvl: 0,
+    crosses: 1,
+    radius: 110,
+    crossSize: 14,
+    damage: 120,
+    tick: 0.18,
+    ang: 0,
+    angSpeed: 2.6,
+    jitter: 0.7,
+  },
 };
 
 const bullets = [];       // player bullets {x,y,vx,vy,r, dmg, pierce, life, color}
@@ -1149,6 +1201,7 @@ function spawnEnemy() {
       const candidates = [];
       if (weapons.wand.enabled) candidates.push(weapons.wand.damage);
       if (weapons.bow.enabled) candidates.push(weapons.bow.damage);
+      if (weapons.holy.enabled) candidates.push(weapons.holy.damage);
       if (weapons.blades.enabled) candidates.push(weapons.blades.damage);
       if (weapons.lightning.enabled) candidates.push(weapons.lightning.damage);
       if (weapons.frost.enabled) candidates.push(weapons.frost.damage);
@@ -1379,10 +1432,20 @@ function forwardVec(dir) {
 }
 
 function updateProjectileWeapons(dt) {
-  for (const w of [weapons.wand, weapons.bow]) {
+  for (const w of [weapons.wand, weapons.bow, weapons.holy]) {
     if (!w.enabled) continue;
     w.cd -= dt;
     if (w.cd > 0) continue;
+
+    if (w.kind === 'cardinal') {
+      // Holy Water: fire in 4 directions
+      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+      for (const [dx, dy] of dirs) {
+        fireBullet(player.x, player.y, dx, dy, w);
+      }
+      w.cd = w.baseCooldown;
+      continue;
+    }
 
     let aimX = 1, aimY = 0;
     if (w.kind === 'auto') {
@@ -1492,7 +1555,7 @@ function updateChainLightning(dt) {
     if (e.hp <= 0) killEnemyAt(i);
   }
 
-  effects.push({ type: 'bolt', pts, t: 0, ttl: 0.14 });
+  effects.push({ type: 'bolt', pts, t: 0, ttl: 0.16 });
   w.cd = w.baseCooldown;
 }
 
@@ -1579,12 +1642,49 @@ function updateFrostShockwave(dt) {
   w.cd = w.baseCooldown;
 }
 
+function updateDragonSoul(dt) {
+  const w = weapons.dragon;
+  if (!w.enabled) return;
+
+  // drift rotation speed a bit for "irregular" feel
+  w.ang += (w.angSpeed + Math.sin(state.elapsed * 1.7) * w.jitter) * dt;
+
+  for (const e of enemies) {
+    e.dragonHitCd = Math.max(0, (e.dragonHitCd || 0) - dt);
+  }
+
+  for (let i = 0; i < w.crosses; i++) {
+    const baseAng = w.ang + i * (Math.PI * 2 / w.crosses);
+    const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 18;
+    const cx = player.x + Math.cos(baseAng) * rad;
+    const cy = player.y + Math.sin(baseAng) * rad;
+
+    // damage enemies in a small AoE around cross
+    for (let ei = enemies.length - 1; ei >= 0; ei--) {
+      const e = enemies[ei];
+      const d = dist(cx, cy, e.x, e.y);
+      if (d < (w.crossSize * 0.9) + e.r) {
+        if ((e.dragonHitCd || 0) <= 0) {
+          damageEnemy(e, w.damage);
+          e.dragonHitCd = w.tick;
+          // knockback
+          const [nx, ny] = norm(e.x - player.x, e.y - player.y);
+          e.vx += nx * 180;
+          e.vy += ny * 180;
+          if (e.hp <= 0) killEnemyAt(ei);
+        }
+      }
+    }
+  }
+}
+
 function updateWeapons(dt) {
   updateProjectileWeapons(dt);
   updateWhirlingBlades(dt);
   updateChainLightning(dt);
   updateMeteor(dt);
   updateFrostShockwave(dt);
+  updateDragonSoul(dt);
 }
 
 function updateBullets(dt) {
@@ -2020,24 +2120,70 @@ const CHEST_POOL = [
 ];
 
 const UPGRADE_POOL = [
+  // Holy Water
+  {
+    id: 'holy_rate',
+    title: '聖水：攻速 +15%',
+    desc: '更頻繁地朝四向噴灑。',
+    apply() { weapons.holy.baseCooldown *= 0.85; weapons.holy.lvl += 1; }
+  },
+  {
+    id: 'holy_dmg',
+    title: '聖水：傷害 +25%',
+    desc: '每一滴更痛。',
+    apply() { weapons.holy.damage = Math.round(weapons.holy.damage * 1.25); weapons.holy.lvl += 1; }
+  },
+  {
+    id: 'holy_pierce',
+    title: '聖水：穿透 +1',
+    desc: '更容易清一排怪。',
+    apply() { weapons.holy.pierce += 1; weapons.holy.lvl += 1; }
+  },
+
+  // Dragon Soul
+  {
+    id: 'unlock_dragon',
+    title: '解鎖 龍魂（Dragon Soul）',
+    desc: '十字繞身旋轉，超高傷害範圍打擊。',
+    apply() { weapons.dragon.enabled = true; weapons.dragon.lvl = Math.max(1, weapons.dragon.lvl); }
+  },
+  {
+    id: 'dragon_more',
+    title: '龍魂：十字 +1',
+    desc: '更多十字同時旋轉。',
+    apply() { weapons.dragon.crosses += 1; weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_dmg',
+    title: '龍魂：傷害 +25%',
+    desc: '秒殺小怪更輕鬆。',
+    apply() { weapons.dragon.damage = Math.round(weapons.dragon.damage * 1.25); weapons.dragon.lvl += 1; }
+  },
+  {
+    id: 'dragon_radius',
+    title: '龍魂：半徑 +20',
+    desc: '掃到更遠的敵人。',
+    apply() { weapons.dragon.radius += 20; weapons.dragon.lvl += 1; }
+  },
+
   // Wand
   {
     id: 'wand_rate',
     title: 'Arcane Wand：施法速度 +15%',
     desc: '魔杖更快自動鎖定與連發。',
-    apply() { weapons.wand.baseCooldown *= 0.85; }
+    apply() { weapons.wand.baseCooldown *= 0.85; weapons.wand.lvl += 1; }
   },
   {
     id: 'wand_dmg',
     title: 'Arcane Wand：傷害 +25%',
     desc: '每發法術更痛。',
-    apply() { weapons.wand.damage = Math.round(weapons.wand.damage * 1.25); }
+    apply() { weapons.wand.damage = Math.round(weapons.wand.damage * 1.25); weapons.wand.lvl += 1; }
   },
   {
     id: 'wand_proj',
     title: 'Arcane Wand：額外飛彈 +1',
     desc: '同時多打一發（散射）。',
-    apply() { weapons.wand.projectiles += 1; }
+    apply() { weapons.wand.projectiles += 1; weapons.wand.lvl += 1; }
   },
 
   // Bow
@@ -2045,19 +2191,25 @@ const UPGRADE_POOL = [
     id: 'unlock_bow',
     title: '解鎖 Dragon Bow',
     desc: '獲得第二把武器：朝前方射出龍焰箭。',
-    apply() { tryEnableWeapon('bow'); }
+    apply() { if (tryEnableWeapon('bow')) weapons.bow.lvl = Math.max(1, weapons.bow.lvl); }
+  },
+  {
+    id: 'unlock_holy',
+    title: '解鎖 聖水（Holy Water）',
+    desc: '同時朝上下左右射出聖水。',
+    apply() { if (tryEnableWeapon('holy')) weapons.holy.lvl = Math.max(1, weapons.holy.lvl); }
   },
   {
     id: 'bow_rate',
     title: 'Dragon Bow：拉弓速度 +15%',
     desc: '射得更快，控場更強。',
-    apply() { weapons.bow.baseCooldown *= 0.85; }
+    apply() { weapons.bow.baseCooldown *= 0.85; weapons.bow.lvl += 1; }
   },
   {
     id: 'bow_dmg',
     title: 'Dragon Bow：傷害 +25%',
     desc: '對高血怪更有效。',
-    apply() { weapons.bow.damage = Math.round(weapons.bow.damage * 1.25); }
+    apply() { weapons.bow.damage = Math.round(weapons.bow.damage * 1.25); weapons.bow.lvl += 1; }
   },
 
   // New weapons unlock
@@ -2065,25 +2217,25 @@ const UPGRADE_POOL = [
     id: 'unlock_blades',
     title: '解鎖 迴旋斬（Whirling Blades）',
     desc: '刀刃圍繞你旋轉，碰到敵人造成傷害。',
-    apply() { tryEnableWeapon('blades'); }
+    apply() { if (tryEnableWeapon('blades')) weapons.blades.lvl = Math.max(1, weapons.blades.lvl); }
   },
   {
     id: 'unlock_lightning',
     title: '解鎖 雷電鏈（Chain Lightning）',
     desc: '自動電擊並跳躍到附近敵人。',
-    apply() { tryEnableWeapon('lightning'); }
+    apply() { weapons.lightning.enabled = true; weapons.lightning.lvl = Math.max(1, weapons.lightning.lvl); }
   },
   {
     id: 'unlock_meteor',
     title: '解鎖 隕石術（Meteor）',
     desc: '隨機落下隕石：大範圍傷害 + 燃燒持續傷害。',
-    apply() { tryEnableWeapon('meteor'); }
+    apply() { weapons.meteor.enabled = true; weapons.meteor.lvl = Math.max(1, weapons.meteor.lvl); }
   },
   {
     id: 'unlock_frost',
     title: '解鎖 冰凍衝擊波（Frost Shockwave）',
     desc: '震退並冰凍敵人 2 秒。',
-    apply() { tryEnableWeapon('frost'); }
+    apply() { weapons.frost.enabled = true; weapons.frost.lvl = Math.max(1, weapons.frost.lvl); }
   },
 
   // Blades upgrades
@@ -2091,19 +2243,25 @@ const UPGRADE_POOL = [
     id: 'blades_more',
     title: '迴旋斬：刀刃 +1',
     desc: '多一把刀，覆蓋更廣。',
-    apply() { weapons.blades.blades += 1; }
+    apply() { weapons.blades.blades += 1; weapons.blades.lvl += 1; }
   },
   {
     id: 'blades_dmg',
     title: '迴旋斬：傷害 +25%',
     desc: '近戰清怪更快。',
-    apply() { weapons.blades.damage = Math.round(weapons.blades.damage * 1.25); }
+    apply() { weapons.blades.damage = Math.round(weapons.blades.damage * 1.25); weapons.blades.lvl += 1; }
   },
   {
     id: 'blades_speed',
-    title: '迴旋斬：旋轉速度 +15%',
-    desc: '更快命中更多敵人。',
-    apply() { weapons.blades.angSpeed *= 1.15; }
+    title: '迴旋斬：旋轉速度 +25%',
+    desc: '更快命中更多敵人（很難近身）。',
+    apply() { weapons.blades.angSpeed *= 1.25; weapons.blades.lvl += 1; }
+  },
+  {
+    id: 'blades_more2',
+    title: '迴旋斬：刀刃 +2',
+    desc: '大幅提升近身防禦。',
+    apply() { weapons.blades.blades += 2; weapons.blades.lvl += 1; }
   },
 
   // Lightning upgrades
@@ -2111,19 +2269,19 @@ const UPGRADE_POOL = [
     id: 'lightning_rate',
     title: '雷電鏈：冷卻 -15%',
     desc: '更頻繁放電。',
-    apply() { weapons.lightning.baseCooldown *= 0.85; }
+    apply() { weapons.lightning.baseCooldown *= 0.85; weapons.lightning.lvl += 1; }
   },
   {
     id: 'lightning_chain',
     title: '雷電鏈：跳躍次數 +1',
     desc: '命中更多目標。',
-    apply() { weapons.lightning.chains += 1; }
+    apply() { weapons.lightning.chains += 1; weapons.lightning.lvl += 1; }
   },
   {
     id: 'lightning_dmg',
     title: '雷電鏈：傷害 +25%',
     desc: '電得更痛。',
-    apply() { weapons.lightning.damage = Math.round(weapons.lightning.damage * 1.25); }
+    apply() { weapons.lightning.damage = Math.round(weapons.lightning.damage * 1.25); weapons.lightning.lvl += 1; }
   },
 
   // Meteor upgrades
@@ -2131,19 +2289,19 @@ const UPGRADE_POOL = [
     id: 'meteor_rate',
     title: '隕石術：冷卻 -15%',
     desc: '更常落隕石。',
-    apply() { weapons.meteor.baseCooldown *= 0.85; }
+    apply() { weapons.meteor.baseCooldown *= 0.85; weapons.meteor.lvl += 1; }
   },
   {
     id: 'meteor_radius',
     title: '隕石術：爆炸半徑 +18',
     desc: '覆蓋更大範圍。',
-    apply() { weapons.meteor.impactRadius += 18; weapons.meteor.burnRadius += 12; }
+    apply() { weapons.meteor.impactRadius += 18; weapons.meteor.burnRadius += 12; weapons.meteor.lvl += 1; }
   },
   {
     id: 'meteor_burn',
     title: '隕石術：燃燒傷害 +25%',
     desc: '地面灼燒更致命。',
-    apply() { weapons.meteor.burnDps = Math.round(weapons.meteor.burnDps * 1.25); }
+    apply() { weapons.meteor.burnDps = Math.round(weapons.meteor.burnDps * 1.25); weapons.meteor.lvl += 1; }
   },
 
   // Frost upgrades
@@ -2151,19 +2309,19 @@ const UPGRADE_POOL = [
     id: 'frost_rate',
     title: '冰凍衝擊波：冷卻 -15%',
     desc: '更頻繁控場。',
-    apply() { weapons.frost.baseCooldown *= 0.85; }
+    apply() { weapons.frost.baseCooldown *= 0.85; weapons.frost.lvl += 1; }
   },
   {
     id: 'frost_freeze',
     title: '冰凍衝擊波：冰凍時間 +0.5s',
     desc: '控場更久。',
-    apply() { weapons.frost.freezeSec += 0.5; }
+    apply() { weapons.frost.freezeSec += 0.5; weapons.frost.lvl += 1; }
   },
   {
     id: 'frost_dmg',
     title: '冰凍衝擊波：傷害 +25%',
     desc: '震退同時更痛。',
-    apply() { weapons.frost.damage = Math.round(weapons.frost.damage * 1.25); }
+    apply() { weapons.frost.damage = Math.round(weapons.frost.damage * 1.25); weapons.frost.lvl += 1; }
   },
 
   // Stats
@@ -2248,8 +2406,12 @@ function openReplaceWeaponModal(newWeaponKey) {
 }
 
 function enabledWeaponKeys() {
-  // count only main weapons (ignore wand always enabled? No: wand counts as a slot)
-  return ['wand', 'bow', 'blades', 'lightning', 'meteor', 'frost'].filter(k => weapons[k].enabled);
+  // weapon slots: Wand/Bow/Holy/Blades only
+  return ['wand', 'bow', 'holy', 'blades'].filter(k => weapons[k].enabled);
+}
+
+function enabledMagicKeys() {
+  return ['lightning', 'frost', 'meteor', 'dragon'].filter(k => weapons[k].enabled);
 }
 
 function weaponEnabledCount() {
@@ -2284,6 +2446,10 @@ function openChoiceModal(mode, title, poolBase) {
     if (u.id.startsWith('blades_') && !weapons.blades.enabled) return false;
     if (u.id === 'unlock_blades' && weapons.blades.enabled) return false;
 
+    // gate holy water upgrades
+    if (u.id.startsWith('holy_') && !weapons.holy.enabled) return false;
+    if (u.id === 'unlock_holy' && weapons.holy.enabled) return false;
+
     // gate lightning upgrades
     if (u.id.startsWith('lightning_') && !weapons.lightning.enabled) return false;
     if (u.id === 'unlock_lightning' && weapons.lightning.enabled) return false;
@@ -2295,6 +2461,10 @@ function openChoiceModal(mode, title, poolBase) {
     // gate frost upgrades
     if (u.id.startsWith('frost_') && !weapons.frost.enabled) return false;
     if (u.id === 'unlock_frost' && weapons.frost.enabled) return false;
+
+    // gate dragon soul upgrades
+    if (u.id.startsWith('dragon_') && !weapons.dragon.enabled) return false;
+    if (u.id === 'unlock_dragon' && weapons.dragon.enabled) return false;
 
     return true;
   });
@@ -2308,7 +2478,8 @@ function openChoiceModal(mode, title, poolBase) {
     const magicPool = pool.filter(u => (
       u.id === 'unlock_meteor' || u.id.startsWith('meteor_') ||
       u.id === 'unlock_frost' || u.id.startsWith('frost_') ||
-      u.id === 'unlock_lightning' || u.id.startsWith('lightning_')
+      u.id === 'unlock_lightning' || u.id.startsWith('lightning_') ||
+      u.id === 'unlock_dragon' || u.id.startsWith('dragon_')
     ));
     if (magicPool.length) {
       const m = pick(magicPool);
@@ -2455,6 +2626,19 @@ function draw() {
     }
   }
 
+  // dragon soul crosses
+  if (weapons.dragon.enabled) {
+    const w = weapons.dragon;
+    for (let i = 0; i < w.crosses; i++) {
+      const ang = w.ang + i * (Math.PI * 2 / w.crosses);
+      const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 18;
+      const bx = player.x + Math.cos(ang) * rad;
+      const by = player.y + Math.sin(ang) * rad;
+      const [sx, sy] = worldToScreen(bx, by);
+      drawSprite(SPR.dragonCross, sx, sy, { scale: 1.0, rot: ang, alpha: 0.95 });
+    }
+  }
+
   // enemies (skeletons)
   for (const e of enemies) {
     const [sx, sy] = worldToScreen(e.x, e.y);
@@ -2550,16 +2734,35 @@ function draw() {
   // effects: lightning bolts & meteors & wave
   for (const fx of effects) {
     if (fx.type === 'bolt') {
+      // true "chain" look: draw a jagged line segment-by-segment between targets
       const a = 1 - fx.t / fx.ttl;
-      ctx.strokeStyle = `rgba(124,242,208,${0.85 * a})`;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      fx.pts.forEach((p, idx) => {
-        const [sx, sy] = worldToScreen(p[0], p[1]);
-        if (idx === 0) ctx.moveTo(sx, sy);
-        else ctx.lineTo(sx, sy);
-      });
-      ctx.stroke();
+      ctx.strokeStyle = `rgba(124,242,208,${0.92 * a})`;
+      ctx.lineWidth = 3.5;
+
+      for (let i = 0; i < fx.pts.length - 1; i++) {
+        const p0 = fx.pts[i];
+        const p1 = fx.pts[i + 1];
+        const [x0, y0] = worldToScreen(p0[0], p0[1]);
+        const [x1, y1] = worldToScreen(p1[0], p1[1]);
+
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+        const L = Math.hypot(dx, dy) || 1;
+        const nx = -dy / L;
+        const ny = dx / L;
+
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        const segs = 7;
+        for (let s = 1; s < segs; s++) {
+          const t = s / segs;
+          const j = Math.sin((t + fx.t * 7) * Math.PI * 2) * 6 * (1 - Math.abs(0.5 - t) * 2);
+          ctx.lineTo(x0 + dx * t + nx * j, y0 + dy * t + ny * j);
+        }
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+      }
+
       ctx.lineWidth = 1;
     }
 
@@ -2666,6 +2869,25 @@ function updateUI() {
   ui.xpNeed.textContent = String(player.xpNeed);
   ui.kills.textContent = String(state.kills);
   ui.time.textContent = formatTime(state.elapsed | 0);
+
+  // right HUD
+  if (ui.hudSlots) ui.hudSlots.textContent = `Slots: ${weaponEnabledCount()}/${player.weaponSlotsMax}`;
+
+  if (ui.hudWeapons) {
+    const ws = enabledWeaponKeys();
+    ui.hudWeapons.innerHTML = ws.map(k => {
+      const lvl = weapons[k].lvl || 0;
+      return `<div class="hudItem"><span class="n">${weaponLabel(k)}</span><span class="l">Lv.${lvl}</span></div>`;
+    }).join('') || `<div class="hudLine">(none)</div>`;
+  }
+
+  if (ui.hudMagic) {
+    const ms = enabledMagicKeys();
+    ui.hudMagic.innerHTML = ms.map(k => {
+      const lvl = weapons[k].lvl || 0;
+      return `<div class="hudItem"><span class="n">${weaponLabel(k)}</span><span class="l">Lv.${lvl}</span></div>`;
+    }).join('') || `<div class="hudLine">(none)</div>`;
+  }
 }
 
 // ---------- loop
@@ -2761,6 +2983,7 @@ function resetRun() {
   player.weaponSlotsMax = 6;
 
   weapons.wand.enabled = true;
+  weapons.wand.lvl = 1;
   weapons.wand.baseCooldown = 0.45;
   weapons.wand.damage = 12;
   weapons.wand.projectiles = 1;
@@ -2768,13 +2991,23 @@ function resetRun() {
   weapons.wand.cd = 0;
 
   weapons.bow.enabled = false;
+  weapons.bow.lvl = 0;
   weapons.bow.baseCooldown = 0.8;
   weapons.bow.damage = 18;
   weapons.bow.projectiles = 1;
   weapons.bow.pierce = 1;
   weapons.bow.cd = 0;
 
+  weapons.holy.enabled = false;
+  weapons.holy.lvl = 0;
+  weapons.holy.baseCooldown = 0.95;
+  weapons.holy.damage = 14;
+  weapons.holy.speed = 520;
+  weapons.holy.pierce = 1;
+  weapons.holy.cd = 0;
+
   weapons.blades.enabled = false;
+  weapons.blades.lvl = 0;
   weapons.blades.blades = 1;
   weapons.blades.damage = 14;
   weapons.blades.tick = 0.22;
@@ -2782,6 +3015,7 @@ function resetRun() {
   weapons.blades.angSpeed = 3.4;
 
   weapons.lightning.enabled = false;
+  weapons.lightning.lvl = 0;
   weapons.lightning.baseCooldown = 1.1;
   weapons.lightning.damage = 20;
   weapons.lightning.chains = 6;
@@ -2789,6 +3023,7 @@ function resetRun() {
   weapons.lightning.cd = 0;
 
   weapons.meteor.enabled = false;
+  weapons.meteor.lvl = 0;
   weapons.meteor.baseCooldown = 2.4;
   weapons.meteor.impactDamage = 88;
   weapons.meteor.impactRadius = 90;
@@ -2800,6 +3035,7 @@ function resetRun() {
   weapons.meteor.cd = 0;
 
   weapons.frost.enabled = false;
+  weapons.frost.lvl = 0;
   weapons.frost.baseCooldown = 2.1;
   weapons.frost.damage = 18;
   weapons.frost.freezeSec = 2.0;
