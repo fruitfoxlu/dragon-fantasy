@@ -2354,15 +2354,19 @@ function autoPickUpgrade() {
   if (!pickFrom.length) return;
   const u = pick(pickFrom);
   u.apply();
-  toast.text = (lang === 'zh') ? `自動升級：${u.title}` : `Auto Upgraded: ${u.title}`;
+  const titleText = (typeof u.title === 'string') ? u.title : (u.title?.[lang] || u.title?.zh || u.title?.en || 'Upgrade');
+  toast.text = (lang === 'zh') ? `自動升級：${titleText}` : `Auto Upgraded: ${titleText}`;
   toast.t = 1.2;
 }
 
 function checkLevelUp() {
   // Convert XP into level steps and queue upgrades.
-  while (player.xp >= player.xpNeed && state.mode === 'play') {
+  // Important: apply level steps even if a modal is open, so level doesn't appear "stuck".
+  let guard = 0;
+  while (player.xp >= player.xpNeed) {
     applyLevelStep();
     state.pendingLevelUps += 1;
+    if (++guard > 200) break; // safety
   }
 
   if (state.mode !== 'play') return;
