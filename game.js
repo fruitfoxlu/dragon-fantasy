@@ -2539,35 +2539,6 @@ function draw() {
   state.camera.x = player.x - centerX;
   state.camera.y = player.y - centerY;
 
-  // debug overlay to verify where the engine thinks the player is
-  if (DEBUG) {
-    try {
-      const [psx, psy] = worldToScreen(player.x, player.y);
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = 'rgba(255,80,80,.9)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(centerX - 14, centerY);
-      ctx.lineTo(centerX + 14, centerY);
-      ctx.moveTo(centerX, centerY - 14);
-      ctx.lineTo(centerX, centerY + 14);
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(80,200,255,.9)';
-      ctx.beginPath();
-      ctx.arc(psx, psy, 10, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.fillStyle = 'rgba(0,0,0,.6)';
-      ctx.fillRect(10, canvas.height - 44, 320, 34);
-      ctx.fillStyle = 'rgba(255,255,255,.92)';
-      ctx.font = '12px ui-monospace, Menlo, monospace';
-      ctx.fillText(`player=(${player.x.toFixed(1)},${player.y.toFixed(1)}) screen=(${psx.toFixed(1)},${psy.toFixed(1)}) cam=(${state.camera.x.toFixed(1)},${state.camera.y.toFixed(1)})`, 16, canvas.height - 22);
-      ctx.restore();
-    } catch {}
-  }
-
   ctx.imageSmoothingEnabled = false;
 
   // ---- pixel tile background (32x32)
@@ -2902,6 +2873,48 @@ function draw() {
     ctx.font = '16px system-ui';
     ctx.fillText('Reload to begin a new legend.', 18, 72);
   }
+
+  // debug overlay (draw last so it stays visible)
+  if (DEBUG) {
+    try {
+      const cx = (state.viewCenter && state.viewCenter.x) ? state.viewCenter.x : (canvas.width / 2);
+      const cy = (state.viewCenter && state.viewCenter.y) ? state.viewCenter.y : (canvas.height / 2);
+      const p = worldToScreen(player.x, player.y);
+      const psx = p[0], psy = p[1];
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+
+      // red cross = screen center (where player should be)
+      ctx.strokeStyle = 'rgba(255,80,80,.95)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 14, cy);
+      ctx.lineTo(cx + 14, cy);
+      ctx.moveTo(cx, cy - 14);
+      ctx.lineTo(cx, cy + 14);
+      ctx.stroke();
+
+      // cyan circle = computed player screen position
+      ctx.strokeStyle = 'rgba(80,200,255,.95)';
+      ctx.beginPath();
+      ctx.arc(psx, psy, 10, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(0,0,0,.6)';
+      ctx.fillRect(10, canvas.height - 44, 360, 34);
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      ctx.fillText(
+        'player=(' + player.x.toFixed(1) + ',' + player.y.toFixed(1) + ') ' +
+        'screen=(' + psx.toFixed(1) + ',' + psy.toFixed(1) + ') ' +
+        'cam=(' + state.camera.x.toFixed(1) + ',' + state.camera.y.toFixed(1) + ')',
+        16,
+        canvas.height - 22
+      );
+      ctx.restore();
+    } catch {}
+  }
+
 }
 
 function updateUI() {
