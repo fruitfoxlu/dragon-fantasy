@@ -1121,6 +1121,12 @@ const state = {
   currentAwardLevel: null,
   awardHistory: [],        // [{lvl, text}]
 
+  // formation schedule
+  nextShieldWallAt: 90,
+  shieldWaves: 0,
+  nextCavAt: 120,
+  cavWaves: 0,
+
   // legacy pacing flags
   pendingLevelUps: 0,
   lastLevelUpAt: -999,
@@ -1465,21 +1471,6 @@ function spawnEnemy() {
   if (side === 3) { sx = px - w / 2 - margin; sy = py + rand(-h / 2, h / 2); }
 
   const tier = Math.min(6, 1 + (state.elapsed / 55) | 0);
-
-  // formations (start later)
-  if (state.elapsed > 90 && enemies.length < 260) {
-    const shieldChance = clamp(0.02 + (state.elapsed - 90) / 240 * 0.06, 0.02, 0.08);
-    const cavChance = clamp(0.01 + (state.elapsed - 120) / 240 * 0.05, 0.0, 0.06);
-    const roll = Math.random();
-    if (roll < cavChance) {
-      spawnCavalryV(side);
-      return;
-    }
-    if (roll < cavChance + shieldChance) {
-      spawnShieldWall(side);
-      return;
-    }
-  }
 
   // enemy mix
   const rangerChance = clamp(0.12 + state.elapsed / 260 * 0.05, 0.12, 0.22);
@@ -3936,6 +3927,22 @@ function loop(now) {
       state.nextBossAt += 300;
     }
 
+    // Formation spawns (fixed schedule)
+    if (state.elapsed >= state.nextShieldWallAt) {
+      state.shieldWaves += 1;
+      for (let k = 0; k < state.shieldWaves; k++) {
+        spawnShieldWall(((Math.random() * 4) | 0));
+      }
+      state.nextShieldWallAt += 90;
+    }
+    if (state.elapsed >= state.nextCavAt) {
+      state.cavWaves += 1;
+      for (let k = 0; k < state.cavWaves; k++) {
+        spawnCavalryV(((Math.random() * 4) | 0));
+      }
+      state.nextCavAt += 120;
+    }
+
     updateWeapons(dt);
     updateBullets(dt);
     collideBullets();
@@ -3983,6 +3990,11 @@ function resetRun() {
   state.awardHistory = [];
   state.lastLevelBatch = null;
   state.pendingLevelUps = 0;
+
+  state.nextShieldWallAt = 90;
+  state.shieldWaves = 0;
+  state.nextCavAt = 120;
+  state.cavWaves = 0;
 
   // spawn at a tile center so camera feels centered and joystick is stable
   player.x = 16;
