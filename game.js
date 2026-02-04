@@ -1122,9 +1122,9 @@ const state = {
   awardHistory: [],        // [{lvl, text}]
 
   // formation schedule
-  nextShieldWallAt: 90,
+  nextShieldWallAt: 60,
   shieldWaves: 0,
-  nextCavAt: 120,
+  nextCavAt: 80,
   cavWaves: 0,
 
   // legacy pacing flags
@@ -3939,7 +3939,7 @@ function loop(now) {
       for (let k = 0; k < spawnN; k++) {
         spawnShieldWall(((Math.random() * 4) | 0));
       }
-      state.nextShieldWallAt += 90;
+      state.nextShieldWallAt += 60;
     }
     if (state.elapsed >= state.nextCavAt) {
       state.cavWaves += 1;
@@ -3950,7 +3950,7 @@ function loop(now) {
       for (let k = 0; k < spawnN; k++) {
         spawnCavalryV(((Math.random() * 4) | 0));
       }
-      state.nextCavAt += 120;
+      state.nextCavAt += 80;
     }
 
     updateWeapons(dt);
@@ -4001,9 +4001,9 @@ function resetRun() {
   state.lastLevelBatch = null;
   state.pendingLevelUps = 0;
 
-  state.nextShieldWallAt = 90;
+  state.nextShieldWallAt = 60;
   state.shieldWaves = 0;
-  state.nextCavAt = 120;
+  state.nextCavAt = 80;
   state.cavWaves = 0;
 
   // spawn at a tile center so camera feels centered and joystick is stable
