@@ -1475,8 +1475,13 @@ function spawnEnemy() {
   // enemy mix
   const rangerChance = clamp(0.12 + state.elapsed / 260 * 0.05, 0.12, 0.22);
   const eliteChance = clamp(0.02 + state.elapsed / 420 * 0.03, 0.02, 0.08);
+  const ninjaChance = clamp(0.03 + state.elapsed / 240 * 0.05, 0.03, 0.10);
 
-  let type = (Math.random() < rangerChance) ? 'ranger' : 'melee';
+  let type = 'melee';
+  const rollType = Math.random();
+  if (rollType < ninjaChance) type = 'ninja';
+  else if (rollType < ninjaChance + rangerChance) type = 'ranger';
+  else type = 'melee';
   const elite = Math.random() < eliteChance;
   const big = (!elite && Math.random() < 0.14); // second mob variant: big brute
 
@@ -1511,6 +1516,13 @@ function spawnEnemy() {
     r += 1;
     hp *= 0.9;
     speed *= 0.95;
+  }
+
+  if (type === 'ninja') {
+    // black ninja: fast, slippery, lower HP
+    r *= 0.95;
+    hp *= 0.75;
+    speed *= 1.55;
   }
 
   if (big) {
@@ -1558,6 +1570,12 @@ function spawnEnemy() {
     chargeVx: 0,
     chargeVy: 0,
     slamCd: 0,
+
+    // ninja dash
+    ninjaDashCd: (type === 'ninja') ? rand(1.3, 2.6) : 0,
+    ninjaDashT: 0,
+    ninjaDashVx: 0,
+    ninjaDashVy: 0,
   });
 }
 
@@ -2348,6 +2366,29 @@ function updateEnemies(dt) {
             e.y += ny * e.speed * dt;
           }
         }
+      } else if (e.type === 'ninja') {
+        // fast chase + short dash (no bullets)
+        e.ninjaDashCd = Math.max(0, (e.ninjaDashCd || 0) - dt);
+
+        if ((e.ninjaDashT || 0) > 0) {
+          e.x += (e.ninjaDashVx || 0) * dt;
+          e.y += (e.ninjaDashVy || 0) * dt;
+          e.ninjaDashT -= dt;
+        } else {
+          if ((e.ninjaDashCd || 0) <= 0 && d < 520) {
+            // small tell
+            effects.push({ type: 'elite_tell', x: e.x, y: e.y, t: 0, ttl: 0.22, dx, dy });
+            const [cx, cy] = norm(dx, dy);
+            e.ninjaDashVx = cx * 820;
+            e.ninjaDashVy = cy * 820;
+            e.ninjaDashT = 0.16;
+            e.ninjaDashCd = rand(1.2, 2.2);
+          }
+          // chase (aggressive)
+          e.x += nx * e.speed * dt;
+          e.y += ny * e.speed * dt;
+        }
+
       } else if (e.type === 'ranger') {
         // prefer mid distance
         if (d > 280) {
@@ -3435,6 +3476,24 @@ function draw() {
       ctx.fillStyle = 'rgba(120,120,130,.95)';
       ctx.fillRect(2 * s, -6 * s, 12 * s, 6 * s);
       ctx.fillRect(4 * s, -8 * s, 8 * s, 2 * s);
+      ctx.restore();
+    }
+
+    // Ninja visual: black tint + red eyes
+    if (e.type === 'ninja' && !frozen) {
+      ctx.save();
+      ctx.globalAlpha = 0.72;
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = 'rgb(10,10,16)';
+      ctx.fillRect(sx - 24 * scale/2, sy - 28 * scale/2, 48 * scale/2, 56 * scale/2);
+      ctx.restore();
+
+      // eyes
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = 'rgba(220,60,60,.95)';
+      ctx.fillRect(sx - 6 * scale/2, sy - 8 * scale/2, 3 * scale/2, 3 * scale/2);
+      ctx.fillRect(sx + 3 * scale/2, sy - 8 * scale/2, 3 * scale/2, 3 * scale/2);
       ctx.restore();
     }
 
