@@ -1140,6 +1140,18 @@ function spawnEnemy() {
   let hp = 24 + tier * 10 + rand(0, 10);
   let speed = 72 + tier * 14 + rand(-8, 10);
 
+  // Difficulty curve by player level:
+  // - before Lv10: normal mobs are easy (one-shot by Wand)
+  // - Lv10+: scales per level but capped to keep the "爽" feeling
+  if (!elite) {
+    if (player.level < 10) {
+      hp = Math.min(hp, weapons.wand.damage * 0.95);
+    } else {
+      const mul = Math.min(2.2, 1 + 0.12 * (player.level - 10));
+      hp *= mul;
+    }
+  }
+
   if (type === 'ranger') {
     r += 1;
     hp *= 0.9;
@@ -2142,6 +2154,16 @@ const UPGRADE_POOL = [
     title: '體魄：最大 HP +20',
     desc: '更耐打，容錯更高。',
     apply() { player.hpMax += 20; player.hp += 20; }
+  },
+  {
+    id: 'hp_pct',
+    title: '強健：最大 HP +10%',
+    desc: '按比例提高血量上限（越後期越賺）。',
+    apply() {
+      const before = player.hpMax;
+      player.hpMax = Math.ceil(player.hpMax * 1.10);
+      player.hp += (player.hpMax - before);
+    }
   },
   {
     id: 'speed',
