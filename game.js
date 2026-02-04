@@ -313,6 +313,32 @@ function sfxHit() {
   } catch {}
 }
 
+function sfxGameOver() {
+  if (!audio.sfxOn) return;
+  try {
+    ensureAudio();
+    if (audio.ctx.state === 'suspended') audio.ctx.resume();
+    const t = audio.ctx.currentTime;
+    const mk = (freq, when, dur, g0, kind='sine') => {
+      const o = audio.ctx.createOscillator();
+      const g = audio.ctx.createGain();
+      o.type = kind;
+      o.frequency.setValueAtTime(freq, when);
+      o.frequency.exponentialRampToValueAtTime(Math.max(40, freq*0.6), when + dur);
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(g0, when + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      o.connect(g);
+      g.connect(audio.master);
+      o.start(when);
+      o.stop(when + dur + 0.03);
+    };
+    // descending two-tone (short, not annoying)
+    mk(220, t, 0.22, 0.06, 'sine');
+    mk(146.8, t + 0.10, 0.26, 0.05, 'triangle');
+  } catch {}
+}
+
 function sfxPickup(type) {
   if (!audio.sfxOn) return;
   // Subtle, pleasant 32-bit style chime (varied so it won't get annoying)
@@ -2009,6 +2035,7 @@ function updateEnemies(dt) {
     }
 
     if (player.hp <= 0) {
+      if (state.mode !== 'dead') sfxGameOver();
       state.mode = 'dead';
     }
   }
