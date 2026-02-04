@@ -74,6 +74,17 @@ body{
   background:rgba(0,0,0,.62);
 }
 #levelup.hidden{display:none}
+
+/* chest modal styling (so players don't confuse it with level-up) */
+#levelup[data-mode="chest"] .card{
+  border-color: rgba(124,242,208,.28);
+  background: linear-gradient(180deg, rgba(8,20,18,.95), rgba(10,12,22,.92));
+}
+#levelup[data-mode="chest"] .choice:hover{border-color:rgba(124,242,208,.9)}
+#levelup[data-mode="chest"] .card h2{color: rgba(124,242,208,.95)}
+
+#levelup[data-mode="levelup"] .card h2{color: rgba(246,195,92,.95)}
+
 .card{
   width:min(760px, calc(100% - 24px));
   background:linear-gradient(180deg, rgba(16,14,10,.94), rgba(10,12,22,.92));

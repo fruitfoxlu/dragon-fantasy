@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v76';
+const BUILD = 'v77';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -3219,6 +3219,11 @@ function openChoiceModal(mode, title, poolBase) {
   state.choiceLock = false;
   paused = true;
   if (ui.modalTitle) ui.modalTitle.textContent = title;
+
+  // Visual distinction: chest vs level-up
+  if (ui.levelup) {
+    ui.levelup.dataset.mode = mode;
+  }
 
   const pool = poolBase.filter(u => {
     // gate bow upgrades
