@@ -2881,7 +2881,7 @@ function updateUI() {
   ui.time.textContent = formatTime(state.elapsed | 0);
 
   // right HUD
-  if (ui.hudSlots) ui.hudSlots.textContent = `Slots: ${weaponEnabledCount()}/${player.weaponSlots} (max ${player.weaponSlotsMax})`;
+  if (ui.hudSlots) ui.hudSlots.textContent = `Slots: ${weaponEnabledCount()}/${player.weaponSlots} (Max ${player.weaponSlotsMax})`;
 
   if (ui.hudWeapons) {
     const ws = enabledWeaponKeys();
