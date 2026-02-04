@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v81';
+const BUILD = 'v82';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1218,8 +1218,8 @@ const weapons = {
     kind: 'orbit',
     enabled: false,
     cd: 0, // not used
-    blades: 1,
-    radius: 46,
+    blades: 3,
+    radius: 92,
     bladeR: 9,
     damage: 14,
     tick: 0.22, // per-enemy hit interval
@@ -2973,7 +2973,8 @@ const UPGRADE_POOL = [
     apply() {
       if (tryEnableWeapon('blades')) {
         weapons.blades.lvl = Math.max(1, weapons.blades.lvl);
-        weapons.blades.blades = Math.max(2, weapons.blades.blades);
+        weapons.blades.blades = Math.max(3, weapons.blades.blades);
+        weapons.blades.radius = Math.max(92, weapons.blades.radius);
       }
     }
   },
@@ -4200,7 +4201,8 @@ function resetRun() {
 
   weapons.blades.enabled = false;
   weapons.blades.lvl = 0;
-  weapons.blades.blades = 2;
+  weapons.blades.blades = 3;
+  weapons.blades.radius = 92;
   weapons.blades.damage = 14;
   weapons.blades.tick = 0.22;
   weapons.blades.ang = 0;
