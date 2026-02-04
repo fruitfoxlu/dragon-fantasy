@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v102';
+const BUILD = 'v103';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1159,6 +1159,7 @@ const player = {
   xpNeed: 10,
   magnet: 70,
   dir: 0,      // 0 down, 1 left, 2 right, 3 up
+  aimAngle: 0, // continuous facing for 8/32-direction weapons (radians)
   moving: false,
   anim: 0,
 };
@@ -1912,6 +1913,7 @@ function updatePlayer(dt) {
   if (player.moving) {
     const [nx, ny] = norm(dx, dy);
     player.dir = dirFromVec(nx, ny);
+    player.aimAngle = Math.atan2(ny, nx);
     player.anim += dt;
 
     // tentative move (collision w/ obstacles)
@@ -1975,10 +1977,12 @@ function updateProjectileWeapons(dt) {
       aimX = e.x - player.x;
       aimY = e.y - player.y;
     } else {
-      // forward fire (based on hero facing)
-      const [fx, fy] = forwardVec(player.dir);
-      aimX = fx;
-      aimY = fy;
+      // forward fire (based on continuous aim angle; quantized to 32 directions)
+      const steps = 32;
+      const a = player.aimAngle || 0;
+      const qa = Math.round(a / (Math.PI * 2) * steps) / steps * (Math.PI * 2);
+      aimX = Math.cos(qa);
+      aimY = Math.sin(qa);
     }
 
     for (let i = 0; i < w.projectiles; i++) {
