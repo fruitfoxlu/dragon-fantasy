@@ -21,6 +21,15 @@ const ctx = canvas.getContext('2d');
 const IS_COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
+// Debug log (on-screen)
+const debugLog = [];
+function dbg(line) {
+  if (!DEBUG) return;
+  const t = (performance.now() / 1000).toFixed(2);
+  debugLog.push(`${t}s ${line}`);
+  while (debugLog.length > 12) debugLog.shift();
+}
+
 const ui = {
   hp: document.getElementById('hp'),
   level: document.getElementById('level'),
@@ -2745,7 +2754,12 @@ function draw() {
     ctx.stroke();
     ctx.restore();
 
-    drawSprite(SPR.hero[player.dir][f], sx, sy, { scale: pScale, alpha });
+    const heroImg = SPR.hero[player.dir][f];
+    drawSprite(heroImg, sx, sy, { scale: pScale, alpha });
+
+    if (DEBUG) {
+      dbg(`heroDraw sx=${sx.toFixed(1)} sy=${sy.toFixed(1)} dir=${player.dir} f=${f} scale=${pScale.toFixed(2)} a=${alpha.toFixed(2)} img=${heroImg.width}x${heroImg.height}`);
+    }
 
     // HP bar above hero (make it very visible)
     const hp01 = clamp(player.hp / player.hpMax, 0, 1);
@@ -2902,17 +2916,18 @@ function draw() {
       const cy = (state.viewCenter && state.viewCenter.y) ? state.viewCenter.y : (canvas.height / 2);
       const p = worldToScreen(player.x, player.y);
       const psx = p[0], psy = p[1];
+
       ctx.save();
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.95;
 
       // Big visible label
-      ctx.fillStyle = 'rgba(0,0,0,.55)';
-      ctx.fillRect(10, 10, 130, 26);
-      ctx.fillStyle = 'rgba(255,255,255,.95)';
+      ctx.fillStyle = 'rgba(0,0,0,.60)';
+      ctx.fillRect(10, 10, 170, 28);
+      ctx.fillStyle = 'rgba(255,255,255,.96)';
       ctx.font = '14px ui-monospace, Menlo, monospace';
-      ctx.fillText('DEBUG ON', 18, 28);
+      ctx.fillText('DEBUG ON (v13)', 18, 30);
 
-      // red cross = screen center (where player should be)
+      // red cross = screen center
       ctx.strokeStyle = 'rgba(255,80,80,.98)';
       ctx.lineWidth = 4;
       ctx.beginPath();
@@ -2928,10 +2943,16 @@ function draw() {
       ctx.beginPath();
       ctx.arc(psx, psy, 26, 0, Math.PI * 2);
       ctx.stroke();
+
+      // bounding box around where hero sprite should be
+      ctx.strokeStyle = 'rgba(246,195,92,.95)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(psx - 28, psy - 28, 56, 56);
       ctx.lineWidth = 1;
 
+      // bottom single-line numbers
       ctx.fillStyle = 'rgba(0,0,0,.6)';
-      ctx.fillRect(10, canvas.height - 44, 360, 34);
+      ctx.fillRect(10, canvas.height - 44, 520, 34);
       ctx.fillStyle = 'rgba(255,255,255,.92)';
       ctx.font = '12px ui-monospace, Menlo, monospace';
       ctx.fillText(
@@ -2941,8 +2962,26 @@ function draw() {
         16,
         canvas.height - 22
       );
+
+      // rolling log
+      const boxW = 520;
+      const boxH = 14 * (debugLog.length + 1);
+      const x0 = 10;
+      const y0 = canvas.height - 44 - 10 - boxH;
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.fillRect(x0, y0, boxW, boxH);
+      ctx.fillStyle = 'rgba(255,255,255,.90)';
+      ctx.font = '11px ui-monospace, Menlo, monospace';
+      ctx.fillText('log:', x0 + 6, y0 + 14);
+      for (let i = 0; i < debugLog.length; i++) {
+        ctx.fillText(debugLog[i], x0 + 6, y0 + 28 + i * 12);
+      }
+
       ctx.restore();
-    } catch {}
+    } catch (e) {
+      // last resort
+      console.warn('debug overlay failed', e);
+    }
   }
 
 }
