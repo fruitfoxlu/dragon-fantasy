@@ -249,6 +249,7 @@ function sfxPickup(type) {
   // Subtle, pleasant 32-bit style chime (varied so it won't get annoying)
   try {
     ensureAudio();
+    if (audio.ctx.state === 'suspended') audio.ctx.resume();
     const t = audio.ctx.currentTime;
     const base = type === 'reward' ? 820 : (type === 'chest' ? 740 : 620);
     const det = 1 + (Math.random() * 0.018 - 0.009);
@@ -3306,6 +3307,8 @@ function startGame() {
 
   // SFX default ON (no background music)
   toggleSfx(true);
+  // ensure iOS starts audio on gesture
+  try { ensureAudio(); if (audio.ctx.state === 'suspended') audio.ctx.resume(); } catch {}
 
   resetRun();
   state.t0 = performance.now();
