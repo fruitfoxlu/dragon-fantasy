@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v79';
+const BUILD = 'v80';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1122,7 +1122,7 @@ const state = {
   kills: 0,
   camera: { x: 0, y: 0 },
 
-  nextBossAt: 60,
+  nextBossAt: 360,
 
   doomShards: 0, // collect 3 shards to cast once
   doomLockT: 0,
@@ -1135,9 +1135,9 @@ const state = {
   awardHistory: [],        // [{lvl, text}]
 
   // formation schedule
-  nextShieldWallAt: 60,
+  nextShieldWallAt: 180,
   shieldWaves: 0,
-  nextCavAt: 60,
+  nextCavAt: 240,
   cavWaves: 0,
 
   // legacy pacing flags
@@ -1487,8 +1487,8 @@ function spawnEnemy() {
 
   // enemy mix
   const rangerChance = clamp(0.12 + state.elapsed / 260 * 0.05, 0.12, 0.22);
-  const eliteChance = (state.elapsed < 60) ? 0 : clamp(0.02 + (state.elapsed - 60) / 420 * 0.03, 0.02, 0.08);
-  const ninjaChance = (state.elapsed < 180) ? 0 : clamp(0.03 + (state.elapsed - 180) / 240 * 0.05, 0.03, 0.10);
+  const eliteChance = (state.elapsed < 180) ? 0 : clamp(0.02 + (state.elapsed - 180) / 420 * 0.03, 0.02, 0.08);
+  const ninjaChance = (state.elapsed < 120) ? 0 : clamp(0.025 + (state.elapsed - 120) / 240 * 0.05, 0.025, 0.10);
 
   let type = 'melee';
   const rollType = Math.random();
@@ -1496,7 +1496,8 @@ function spawnEnemy() {
   else if (rollType < ninjaChance + rangerChance) type = 'ranger';
   else type = 'melee';
   const elite = Math.random() < eliteChance;
-  const big = (!elite && Math.random() < 0.14); // second mob variant: big brute
+  const bigChance = (state.elapsed < 60) ? 0 : clamp(0.05 + (state.elapsed - 60) / 240 * 0.09, 0.05, 0.14);
+  const big = (!elite && Math.random() < bigChance); // second mob variant: big brute
 
   let r = 11 + tier * 1.5;
   let hp = 24 + tier * 10 + rand(0, 10);
@@ -4056,37 +4057,45 @@ function loop(now) {
       if (Math.random() < 0.30) spawnEnemy();
     }
 
-    // Boss spawn (strict time gate)
+    // Boss spawn (fixed time gate)
     const bossAlive = enemies.some(e => e.type === 'boss');
-    if (state.elapsed >= 60 && !bossAlive && state.elapsed >= state.nextBossAt) {
+    if (state.elapsed >= 360 && !bossAlive && state.elapsed >= state.nextBossAt) {
       spawnBoss();
       state.nextBossAt += 300;
     }
 
-    // Formation spawns (fixed schedule)
+    // Formation spawns (unlocked by time; probabilistic; squads only)
     // IMPORTANT: cap spawns to avoid runaway enemy counts (crash / freeze on mobile).
     const MAX_ENEMIES = 200;
-    if (state.elapsed >= state.nextShieldWallAt) {
-      state.shieldWaves += 1;
-      const waves = Math.min(4, state.shieldWaves);
+
+    // Shield wall unlock at 3:00
+    if (state.elapsed >= 180 && state.elapsed >= state.nextShieldWallAt) {
       const room = Math.max(0, MAX_ENEMIES - enemies.length);
       const canForm = Math.floor(room / 20);
-      const spawnN = Math.min(waves, canForm);
-      for (let k = 0; k < spawnN; k++) {
+      const mins = (state.elapsed - 180) / 60;
+      const p = clamp(0.12 + mins * 0.06, 0.12, 0.42); // slowly rises
+      if (canForm > 0 && Math.random() < p) {
         spawnShieldWall(((Math.random() * 4) | 0));
+        state.shieldWaves += 1;
+        state.nextShieldWallAt = state.elapsed + 60; // at most ~1/min
+      } else {
+        state.nextShieldWallAt = state.elapsed + 10; // retry soon
       }
-      state.nextShieldWallAt += 60;
     }
-    if (state.elapsed >= state.nextCavAt) {
-      state.cavWaves += 1;
-      const waves = Math.min(4, state.cavWaves);
+
+    // Cavalry unlock at 4:00
+    if (state.elapsed >= 240 && state.elapsed >= state.nextCavAt) {
       const room = Math.max(0, MAX_ENEMIES - enemies.length);
       const canForm = Math.floor(room / 15);
-      const spawnN = Math.min(waves, canForm);
-      for (let k = 0; k < spawnN; k++) {
+      const mins = (state.elapsed - 240) / 60;
+      const p = clamp(0.10 + mins * 0.05, 0.10, 0.35);
+      if (canForm > 0 && Math.random() < p) {
         spawnCavalryV(((Math.random() * 4) | 0));
+        state.cavWaves += 1;
+        state.nextCavAt = state.elapsed + 60; // at most ~1/min
+      } else {
+        state.nextCavAt = state.elapsed + 10;
       }
-      state.nextCavAt += 60;
     }
 
     updateWeapons(dt);
@@ -4128,7 +4137,7 @@ function resetRun() {
 
   state.elapsed = 0;
   state.kills = 0;
-  state.nextBossAt = 60;
+  state.nextBossAt = 360;
   state.doomShards = 0;
   state.doomLockT = 0;
   state.spawnPauseT = 0;
@@ -4139,9 +4148,9 @@ function resetRun() {
   state.lastLevelBatch = null;
   state.pendingLevelUps = 0;
 
-  state.nextShieldWallAt = 60;
+  state.nextShieldWallAt = 180;
   state.shieldWaves = 0;
-  state.nextCavAt = 60;
+  state.nextCavAt = 240;
   state.cavWaves = 0;
 
   // spawn at a tile center so camera feels centered and joystick is stable
