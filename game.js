@@ -19,6 +19,7 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 const IS_COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+const DEBUG = new URLSearchParams(location.search).has('debug');
 
 const ui = {
   hp: document.getElementById('hp'),
@@ -2529,19 +2530,43 @@ function worldToScreen(x, y) {
 }
 
 function draw() {
-  // camera: center player on the *visible* center (account for top UI on mobile/in-app browsers)
-  const rect = canvas.getBoundingClientRect();
-  const scale = rect.width ? (canvas.width / rect.width) : 1;
-  const uiTop = document.getElementById('ui');
-  const uiRect = uiTop ? uiTop.getBoundingClientRect() : null;
-  const uiH = uiRect ? (uiRect.height * scale) : 0;
-  const biasY = clamp(uiH * 0.35, 0, 92);
+  // camera: always keep player at canvas center.
+  // (Some in-app browsers report unreliable DOM layout rects which can push the camera off-screen.)
   const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2 + biasY;
+  const centerY = canvas.height / 2 + (IS_COARSE ? 56 : 0); // slight downward bias on phones
   state.viewCenter = { x: centerX, y: centerY };
 
   state.camera.x = player.x - centerX;
   state.camera.y = player.y - centerY;
+
+  // debug overlay to verify where the engine thinks the player is
+  if (DEBUG) {
+    try {
+      const [psx, psy] = worldToScreen(player.x, player.y);
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = 'rgba(255,80,80,.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(centerX - 14, centerY);
+      ctx.lineTo(centerX + 14, centerY);
+      ctx.moveTo(centerX, centerY - 14);
+      ctx.lineTo(centerX, centerY + 14);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(80,200,255,.9)';
+      ctx.beginPath();
+      ctx.arc(psx, psy, 10, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(0,0,0,.6)';
+      ctx.fillRect(10, canvas.height - 44, 320, 34);
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      ctx.fillText(`player=(${player.x.toFixed(1)},${player.y.toFixed(1)}) screen=(${psx.toFixed(1)},${psy.toFixed(1)}) cam=(${state.camera.x.toFixed(1)},${state.camera.y.toFixed(1)})`, 16, canvas.height - 22);
+      ctx.restore();
+    } catch {}
+  }
 
   ctx.imageSmoothingEnabled = false;
 
