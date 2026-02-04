@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v69';
+const BUILD = 'v70';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1114,6 +1114,7 @@ const state = {
   nextBossAt: 60,
 
   doomShards: 0, // collect 3 shards to cast once
+  doomLockT: 0,
 
   // level-up pacing (strict: one reward per level)
   awardQueue: [],          // [levelNumber]
@@ -2061,25 +2062,34 @@ function updateDragonSoul(dt) {
   }
 }
 
+function doomPulse() {
+  // one-time full-screen damage (no loops/recursion)
+  sfxDoom();
+  toast.text = (lang === 'zh') ? '毀天滅地！' : 'DOOM!';
+  toast.t = 1.4;
+  effects.push({ type: 'doom', t: 0, ttl: 0.55 });
+
+  // deal a big chunk of damage once (doesn't necessarily wipe)
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    const dmg = Math.max(40, e.hp * 0.65); // chunk; leaves survivors
+    damageEnemy(e, dmg, player.x, player.y);
+    if (e.hp <= 0) killEnemyAt(i);
+  }
+}
+
 function doomStrike(free=false) {
   if (state.mode !== 'play' || paused) return;
+  if ((state.doomLockT || 0) > 0) return;
 
   if (!free) {
     if ((state.doomShards || 0) < 3) return;
     state.doomShards -= 3;
   }
 
-  sfxDoom();
-  toast.text = (lang === 'zh') ? '毀天滅地！' : 'DOOM!';
-  toast.t = 1.4;
-
-  // screen effect
-  effects.push({ type: 'doom', t: 0, ttl: 0.55 });
-
-  // kill everything on the field (including boss)
-  while (enemies.length) {
-    killEnemyAt(enemies.length - 1);
-  }
+  // lock to prevent accidental re-trigger in the same moment
+  state.doomLockT = 0.65;
+  doomPulse();
 }
 
 function updateWeapons(dt) {
@@ -3967,6 +3977,7 @@ function loop(now) {
 
   if (state.mode === 'play') {
     state.elapsed = (now - state.t0) / 1000;
+    state.doomLockT = Math.max(0, (state.doomLockT || 0) - dt);
 
     toast.t = Math.max(0, toast.t - dt);
 
