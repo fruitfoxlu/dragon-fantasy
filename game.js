@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v85';
+const BUILD = 'v86';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -68,8 +68,6 @@ const ui = {
   hpFill: document.getElementById('hpFill'),
   sfxBtn: document.getElementById('sfxBtn'),
   langBtn: document.getElementById('langBtn'),
-  doomBtn: document.getElementById('doomBtn'),
-  doomTouchBtn: document.getElementById('doomTouchBtn'),
   awardLine: document.getElementById('awardLine'),
   start: document.getElementById('start'),
   startBtn: document.getElementById('startBtn'),
@@ -342,31 +340,6 @@ function sfxGameOver() {
   } catch {}
 }
 
-function sfxDoom() {
-  if (!audio.sfxOn) return;
-  try {
-    ensureAudio();
-    if (audio.ctx.state === 'suspended') audio.ctx.resume();
-    const t = audio.ctx.currentTime;
-    const mk = (freq, when, dur, g0, kind='sawtooth') => {
-      const o = audio.ctx.createOscillator();
-      const g = audio.ctx.createGain();
-      o.type = kind;
-      o.frequency.setValueAtTime(freq, when);
-      o.frequency.exponentialRampToValueAtTime(Math.max(40, freq*0.45), when + dur);
-      g.gain.setValueAtTime(0.0001, when);
-      g.gain.exponentialRampToValueAtTime(g0, when + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-      o.connect(g);
-      g.connect(audio.master);
-      o.start(when);
-      o.stop(when + dur + 0.03);
-    };
-    mk(260, t, 0.34, 0.06, 'sawtooth');
-    mk(180, t + 0.06, 0.38, 0.05, 'triangle');
-    mk(520, t + 0.10, 0.18, 0.03, 'square');
-  } catch {}
-}
 function sfxPickup(type) {
   if (!audio.sfxOn) return;
   // Subtle, pleasant 32-bit style chime (varied so it won't get annoying)
@@ -1100,16 +1073,6 @@ ui.sfxBtn?.addEventListener('click', () => {
   try { localStorage.setItem('df_sfx', audio.sfxOn ? '1' : '0'); } catch {}
 });
 
-// Doom button no longer manually casts.
-// (Doom triggers only when 3 shards are collected.)
-ui.doomBtn?.addEventListener('click', () => {
-  toast.text = (lang === 'zh') ? '毀天滅地只能靠集碎片觸發（3/3 自動施放）' : 'Doom only triggers via shards (auto-cast at 3/3).';
-  toast.t = 1.2;
-});
-ui.doomTouchBtn?.addEventListener('click', () => {
-  toast.text = (lang === 'zh') ? '毀天滅地只能靠集碎片觸發（3/3 自動施放）' : 'Doom only triggers via shards (auto-cast at 3/3).';
-  toast.t = 1.2;
-});
 
 // init language (deferred until after state init to avoid ReferenceError)
 
@@ -1123,10 +1086,6 @@ const state = {
   camera: { x: 0, y: 0 },
 
   nextBossAt: 360,
-
-  doomShards: 0, // collect 6 shards to cast once
-  doomLockT: 0,
-  spawnPauseT: 0,
 
   // level-up pacing (strict: one reward per level)
   awardQueue: [],          // [levelNumber]
@@ -1307,7 +1266,6 @@ function pushChest(x, y, r=12) {
 const slotOrbs = [];      // {x,y,r}
 const vacuumGems = [];    // {x,y,r}
 const heals = [];         // {x,y,r, amount}
-const doomOrbs = [];      // {x,y,r}
 
 // Visual/area effects
 const effects = [];
@@ -1719,8 +1677,6 @@ function killEnemyAt(index) {
     }
     // Boss: guaranteed vacuum gem
     vacuumGems.push({ x: e.x, y: e.y, r: 14 });
-    // Boss drop: doom shard (+1). Collect 3 shards to cast Doom.
-    doomOrbs.push({ x: e.x + rand(-16, 16), y: e.y + rand(-16, 16), r: 12 });
   } else if (e.elite) {
     // Elite: guaranteed chest + extra chance.
     sfxPickup('reward');
@@ -2113,37 +2069,6 @@ function updateDragonSoul(dt) {
       }
     }
   }
-}
-
-function doomPulse() {
-  // one-time full-screen wipe (independent of any weapon stats)
-  sfxDoom();
-  toast.text = (lang === 'zh') ? '毀天滅地！' : 'DOOM!';
-  toast.t = 1.2;
-
-  // white flash (hold 1s)
-  effects.push({ type: 'flash', t: 0, ttl: 1.0, color: 'rgba(255,255,255,1)' });
-
-  // wipe enemies without triggering loot chains (prevents doom->drops->doom loops)
-  state.kills += enemies.length;
-  enemies.length = 0;
-
-  // pause new spawns briefly
-  state.spawnPauseT = 3.0;
-}
-
-function doomStrike(free=false) {
-  if (state.mode !== 'play' || paused) return;
-  if ((state.doomLockT || 0) > 0) return;
-
-  if (!free) {
-    if ((state.doomShards || 0) < 6) return;
-    state.doomShards -= 6;
-  }
-
-  // lock to prevent accidental re-trigger in the same moment
-  state.doomLockT = 0.65;
-  doomPulse();
 }
 
 function updateWeapons(dt) {
@@ -2582,32 +2507,6 @@ function updateHeals(dt) {
   }
 }
 
-function updateDoomOrbs(dt) {
-  for (let i = doomOrbs.length - 1; i >= 0; i--) {
-    const o = doomOrbs[i];
-    const d = dist(player.x, player.y, o.x, o.y);
-    if (d < player.r + o.r) {
-      doomOrbs.splice(i, 1);
-      state.doomShards = (state.doomShards || 0) + 1;
-      sfxPickup('reward');
-
-      const c = state.doomShards % 6;
-      if (c === 0) {
-        // auto-cast when reaching 6 shards, then reset
-        state.doomShards = 0;
-        toast.text = (lang === 'zh') ? '集滿 6 個碎片！自動施放毀天滅地！' : '6 shards collected! Auto-casting DOOM!';
-        toast.t = 2.0;
-        doomStrike(true);
-        return;
-      }
-
-      toast.text = (lang === 'zh') ? `毀天碎片 +1（${c}/6）` : `Doom Shard +1 (${c}/6)`;
-      toast.t = 2.0;
-      return;
-    }
-  }
-}
-
 function updateSlots(dt) {
   for (let i = slotOrbs.length - 1; i >= 0; i--) {
     const s = slotOrbs[i];
@@ -2840,48 +2739,6 @@ function checkLevelUp() {
 }
 
 // ---------- upgrades
-const CHEST_POOL = [
-  {
-    id: 'chest_heal',
-    title: { zh: '神聖藥水：回復 30 HP', en: 'Holy Potion: Heal 30 HP' },
-    desc: { zh: '立刻回復生命（不超過上限）。', en: 'Instantly heal (up to max HP).' },
-    apply() { player.hp = Math.min(player.hpMax, player.hp + 30); }
-  },
-  {
-    id: 'chest_vacuum',
-    title: { zh: '靈魂牽引：吸起全地圖經驗', en: 'Soul Vacuum: Pull All XP' },
-    desc: { zh: '把地圖上的魂石全部吸到你身邊。', en: 'Pull all XP gems to you.' },
-    apply() {
-      // spawn a vacuum gem at player to trigger global pull behavior
-      vacuumGems.push({ x: player.x, y: player.y, r: 14 });
-      sfxPickup('reward');
-    }
-  },
-  {
-    id: 'chest_doom',
-    title: {
-      zh: () => {
-        const rem = 6 - ((state.doomShards || 0) % 6);
-        const missing = (rem === 6) ? 0 : rem;
-        return `毀天碎片：+1（還缺 ${missing} 片）`;
-      },
-      en: () => {
-        const rem = 6 - ((state.doomShards || 0) % 6);
-        const missing = (rem === 6) ? 0 : rem;
-        return `Doom Shard: +1 (${missing} to go)`;
-      }
-    },
-    desc: { zh: '收集 6 個碎片才能施放一次毀天滅地。', en: 'Collect 6 shards to cast Doom once.' },
-    apply() {
-      state.doomShards = (state.doomShards || 0) + 1;
-      sfxPickup('reward');
-      if ((state.doomShards % 6) === 0) {
-        state.doomShards = 0;
-        doomStrike(true);
-      }
-    }
-  },
-];
 
 const UPGRADE_POOL = [
   // Holy Water
@@ -3210,7 +3067,110 @@ function openLevelUp() {
 }
 
 function openChest() {
-  openChoiceModal('chest', t('chestTitle'), CHEST_POOL);
+  // Chest: spells only (magic), 3-choice; if all magic maxed, offer XP instead.
+  state.mode = 'chest';
+  state.choiceLock = false;
+  paused = true;
+  if (ui.levelup) ui.levelup.dataset.mode = 'chest';
+  if (ui.modalTitle) ui.modalTitle.textContent = t('chestTitle');
+
+  const MAGIC_CAP = 10;
+  const gates = { meteor: 5, frost: 10, lightning: 15, dragon: 20 };
+
+  const magicEnabled = (k) => weapons[k].enabled;
+  const magicLvl = (k) => (weapons[k].lvl || 0);
+  const magicCapped = (k) => magicEnabled(k) && magicLvl(k) >= MAGIC_CAP;
+
+  // Build a pool from existing upgrades, but only magic-related ones.
+  const pool = UPGRADE_POOL.filter(u => {
+    const id = u.id;
+    // only magic items
+    const isMagic = (
+      id === 'unlock_meteor' || id.startsWith('meteor_') ||
+      id === 'unlock_frost' || id.startsWith('frost_') ||
+      id === 'unlock_lightning' || id.startsWith('lightning_') ||
+      id === 'unlock_dragon' || id.startsWith('dragon_')
+    );
+    if (!isMagic) return false;
+
+    // gate by level
+    if ((id === 'unlock_meteor' || id.startsWith('meteor_')) && player.level < gates.meteor) return false;
+    if ((id === 'unlock_frost' || id.startsWith('frost_')) && player.level < gates.frost) return false;
+    if ((id === 'unlock_lightning' || id.startsWith('lightning_')) && player.level < gates.lightning) return false;
+    if ((id === 'unlock_dragon' || id.startsWith('dragon_')) && player.level < gates.dragon) return false;
+
+    // unlock only if not enabled
+    if (id === 'unlock_meteor') return !weapons.meteor.enabled;
+    if (id === 'unlock_frost') return !weapons.frost.enabled;
+    if (id === 'unlock_lightning') return !weapons.lightning.enabled;
+    if (id === 'unlock_dragon') return !weapons.dragon.enabled;
+
+    // upgrades only if enabled and not capped
+    if (id.startsWith('meteor_')) return weapons.meteor.enabled && magicLvl('meteor') < MAGIC_CAP;
+    if (id.startsWith('frost_')) return weapons.frost.enabled && magicLvl('frost') < MAGIC_CAP;
+    if (id.startsWith('lightning_')) return weapons.lightning.enabled && magicLvl('lightning') < MAGIC_CAP;
+
+    if (id.startsWith('dragon_')) {
+      if (!weapons.dragon.enabled) return false;
+      if (magicLvl('dragon') >= MAGIC_CAP) return false;
+      const nextD = nextDragonUpgradeId();
+      return nextD && id === nextD;
+    }
+
+    return false;
+  });
+
+  const xpOpt = (mult, idx) => ({
+    id: `chest_xp_${idx}`,
+    title: { zh: `靈魂洪流：+${Math.floor(mult * 100)}% 經驗`, en: `Soul Surge: +${Math.floor(mult * 100)}% XP` },
+    desc: { zh: '魔法都滿級了，改拿經驗。', en: 'All spells maxed; take XP instead.' },
+    apply() {
+      player.xp += Math.floor(player.xpNeed * mult);
+      checkLevelUp();
+    }
+  });
+
+  // If all magic are capped, go full XP.
+  const allMagicCapped = magicCapped('meteor') && magicCapped('frost') && magicCapped('lightning') && magicCapped('dragon');
+
+  currentChoices = [];
+  if (allMagicCapped || pool.length === 0) {
+    currentChoices = [xpOpt(0.6, 1), xpOpt(0.8, 2), xpOpt(1.0, 3)];
+  } else {
+    const used = new Set();
+    while (currentChoices.length < 3 && used.size < pool.length) {
+      const u = pick(pool);
+      if (used.has(u.id)) continue;
+      used.add(u.id);
+      currentChoices.push(u);
+    }
+    // fill remaining with XP
+    let k = 1;
+    while (currentChoices.length < 3) {
+      currentChoices.push(xpOpt(0.7 + 0.1 * (k - 1), 90 + k));
+      k++;
+    }
+  }
+
+  // render
+  ui.choices.innerHTML = '';
+  currentChoices.forEach((u, idx) => {
+    const div = document.createElement('div');
+    div.className = 'choice';
+    const title = (typeof u.title === 'function')
+      ? u.title()
+      : ((typeof u.title === 'object')
+        ? ((typeof u.title[lang] === 'function') ? u.title[lang]() : (u.title[lang] || u.title.en || u.title.zh))
+        : u.title);
+    const desc = (typeof u.desc === 'function')
+      ? u.desc()
+      : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
+    div.innerHTML = `<div class="t">${idx + 1}. ${title}</div><div class="d">${desc}</div>`;
+    div.addEventListener('click', () => chooseUpgrade(idx));
+    ui.choices.appendChild(div);
+  });
+
+  ui.levelup.classList.remove('hidden');
 }
 
 function openReplaceWeaponModal(newWeaponKey) {
@@ -3296,6 +3256,15 @@ function openChoiceModal(mode, title, poolBase) {
   }
 
   const pool = poolBase.filter(u => {
+    // Level-up should never offer magic (magic comes from chests only)
+    if (mode === 'levelup') {
+      if (
+        u.id === 'unlock_meteor' || u.id.startsWith('meteor_') ||
+        u.id === 'unlock_frost' || u.id.startsWith('frost_') ||
+        u.id === 'unlock_lightning' || u.id.startsWith('lightning_') ||
+        u.id === 'unlock_dragon' || u.id.startsWith('dragon_')
+      ) return false;
+    }
     // gate bow upgrades
     if (u.id.startsWith('bow_') && !weapons.bow.enabled) return false;
     if (u.id === 'unlock_bow' && weapons.bow.enabled) return false;
@@ -3328,8 +3297,6 @@ function openChoiceModal(mode, title, poolBase) {
     // gate frost upgrades
     if (u.id.startsWith('frost_') && !weapons.frost.enabled) return false;
     if (u.id === 'unlock_frost' && weapons.frost.enabled) return false;
-    // lock Frost Sigil chest reward until Frost reaches level 20
-    if (u.id === 'chest_frost_big' && (weapons.frost.lvl || 0) < 20) return false;
 
     // gate dragon soul upgrades (force an ordered sequence)
     if (u.id.startsWith('dragon_') && !weapons.dragon.enabled) return false;
@@ -3505,12 +3472,6 @@ function draw() {
   for (const h of heals) {
     const [sx, sy] = worldToScreen(h.x, h.y);
     drawSprite(SPR.heal, sx, sy, { scale: 1.1, alpha: 0.98 });
-  }
-
-  // doom orbs
-  for (const o of doomOrbs) {
-    const [sx, sy] = worldToScreen(o.x, o.y);
-    drawSprite(SPR.orbDoom, sx, sy, { scale: 1.25, alpha: 0.98 });
   }
 
   // weapon slot orbs
@@ -4019,15 +3980,6 @@ function updateUI() {
   // right HUD
   if (ui.hudSlots) ui.hudSlots.textContent = `Slots: ${weaponEnabledCount()}/${player.weaponSlots} (Max ${player.weaponSlotsMax})`;
 
-  if (ui.doomBtn || ui.doomTouchBtn) {
-    const shards = (state.doomShards || 0);
-    const ready = Math.floor(shards / 6);
-    const rem = shards % 6;
-    const label = (ready > 0) ? `Doom: ${ready} (${rem}/6)` : `Doom: ${rem}/6`;
-    if (ui.doomBtn) ui.doomBtn.textContent = label;
-    if (ui.doomTouchBtn) ui.doomTouchBtn.textContent = label;
-  }
-
   if (ui.awardLine) {
     if (state.currentAwardLevel != null) {
       ui.awardLine.textContent = (lang === 'zh')
@@ -4076,8 +4028,6 @@ function loop(now) {
 
   if (state.mode === 'play') {
     state.elapsed = (now - state.t0) / 1000;
-    state.doomLockT = Math.max(0, (state.doomLockT || 0) - dt);
-    state.spawnPauseT = Math.max(0, (state.spawnPauseT || 0) - dt);
 
     toast.t = Math.max(0, toast.t - dt);
 
@@ -4094,26 +4044,6 @@ function loop(now) {
 
     // spawn pacing ramps up
     enemySpawnAcc += dt;
-
-    // Doom spawn-pause (3s)
-    if ((state.spawnPauseT || 0) > 0) {
-      // still update movement/attacks, but don't spawn more enemies/formations/boss.
-      updateWeapons(dt);
-      updateBullets(dt);
-      collideBullets();
-      updateEffects(dt);
-      updateEnemies(dt);
-      updateVacuumGems(dt);
-      updateHeals(dt);
-      updateDoomOrbs(dt);
-      updateSlots(dt);
-      updateChests(dt);
-      updateGems(dt);
-      draw();
-      updateUI();
-      if (state.mode !== 'dead') requestAnimationFrame(loop);
-      return;
-    }
     // Spawn pacing: every 60s, spawn speed +50% (i.e., interval * 2/3).
     const minute = Math.floor(state.elapsed / 60);
     const speedMul = Math.pow(1.5, minute);
@@ -4176,7 +4106,6 @@ function loop(now) {
     updateEnemies(dt);
     updateVacuumGems(dt);
     updateHeals(dt);
-    updateDoomOrbs(dt);
     updateSlots(dt);
     updateChests(dt);
     updateGems(dt);
@@ -4197,7 +4126,6 @@ function resetRun() {
   slotOrbs.length = 0;
   vacuumGems.length = 0;
   heals.length = 0;
-  doomOrbs.length = 0;
   effects.length = 0;
 
   toast.text = '';
@@ -4209,9 +4137,6 @@ function resetRun() {
   state.elapsed = 0;
   state.kills = 0;
   state.nextBossAt = 360;
-  state.doomShards = 0;
-  state.doomLockT = 0;
-  state.spawnPauseT = 0;
   state.awardQueue = [];
   state.awardedLevels = {};
   state.currentAwardLevel = null;

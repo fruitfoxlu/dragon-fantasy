@@ -190,12 +190,6 @@ body{
   border-radius:14px;
   font-weight:900;
 }
-#doomTouchBtn{
-  left:18px;
-  right:auto;
-  bottom:28px;
-  border-color: rgba(180,90,255,.60);
-}
 
 /* Only show touch UI on coarse pointers */
 @media (pointer: fine) {
