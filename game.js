@@ -1294,14 +1294,21 @@ function killEnemyAt(index) {
     chests.push({ x: e.x, y: e.y, r: 12 });
     if (Math.random() < 0.35) chests.push({ x: e.x + rand(-14, 14), y: e.y + rand(-14, 14), r: 12 });
 
-    // Elite: chance to drop a weapon slot (max 6)
-    if (player.weaponSlots < player.weaponSlotsMax && Math.random() < 0.22) {
-      slotOrbs.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 10 });
-    }
-
-    // Elite: rare vacuum gem
-    if (Math.random() < 0.10) {
-      vacuumGems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12 });
+    // Elite bonus drops: slot-orb only if not maxed; otherwise redistribute odds.
+    const roll = Math.random();
+    if (player.weaponSlots < player.weaponSlotsMax) {
+      if (roll < 0.22) {
+        slotOrbs.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 10 });
+      } else if (roll < 0.32) {
+        vacuumGems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12 });
+      }
+    } else {
+      // slot maxed: shift that probability to other loot
+      if (roll < 0.18) {
+        vacuumGems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12 });
+      } else if (roll < 0.30) {
+        heals.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12, amount: 25 });
+      }
     }
   } else {
     // Normal mobs: small chance to drop a healing potion.
@@ -1809,7 +1816,8 @@ function updateHeals(dt) {
     if (d < player.r + h.r) {
       heals.splice(i, 1);
       const before = player.hp;
-      player.hp = Math.min(player.hpMax, player.hp + h.amount);
+      // heal potions can overheal above max HP (temporary buffer)
+      player.hp = Math.min(player.hpMax * 1.5, player.hp + h.amount);
       const gained = Math.max(0, (player.hp - before) | 0);
       if (gained > 0) {
         toast.text = t('healPick', gained);
