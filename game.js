@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v91';
+const BUILD = 'v92';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -77,8 +77,6 @@ const ui = {
   joy: document.getElementById('joy'),
   joyKnob: document.querySelector('#joy .joyKnob'),
   pauseBtn: document.getElementById('pauseBtn'),
-
-  hudSlots: document.getElementById('hudSlots'),
   hudWeapons: document.getElementById('hudWeapons'),
   hudMagic: document.getElementById('hudMagic'),
   hudChestHint: document.getElementById('hudChestHint'),
@@ -1137,8 +1135,6 @@ const player = {
   xp: 0,
   xpNeed: 10,
   magnet: 70,
-  weaponSlots: 4,
-  weaponSlotsMax: 6,
   dir: 0,      // 0 down, 1 left, 2 right, 3 up
   moving: false,
   anim: 0,
@@ -1282,7 +1278,6 @@ function pushChest(x, y, r=12) {
   chests.push({ x, y, r });
   return true;
 }
-const slotOrbs = [];      // {x,y,r}
 const vacuumGems = [];    // {x,y,r}
 const heals = [];         // {x,y,r, amount}
 
@@ -1708,27 +1703,19 @@ function killEnemyAt(index) {
     // Boss: guaranteed vacuum gem
     vacuumGems.push({ x: e.x, y: e.y, r: 14 });
   } else if (e.elite) {
-    // Elite: guaranteed chest + extra chance.
+    // Elite: guaranteed treasure gem + extra chance.
     sfxPickup('reward');
     pushChest(e.x, e.y, 12);
     if (Math.random() < 0.35) pushChest(e.x + rand(-14, 14), e.y + rand(-14, 14), 12);
 
-    // Elite bonus drops: slot-orb only if not maxed; otherwise redistribute odds.
+    // Elite bonus: small chance of vacuum or potion
     const roll = Math.random();
-    if (player.weaponSlots < player.weaponSlotsMax) {
-      if (roll < 0.22) {
-        slotOrbs.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 10 });
-      } else if (roll < 0.32) {
-        vacuumGems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12 });
-      }
-    } else {
-      // slot maxed: shift that probability to other loot
-      if (roll < 0.18) {
-        vacuumGems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12 });
-      } else if (roll < 0.30) {
-        heals.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12, amount: 25 });
-      }
+    if (roll < 0.18) {
+      vacuumGems.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12 });
+    } else if (roll < 0.30) {
+      heals.push({ x: e.x + rand(-10, 10), y: e.y + rand(-10, 10), r: 12, amount: 25 });
     }
+
   } else {
     // Normal mobs: small chance to drop a healing potion.
     if (Math.random() < 0.03) {
@@ -2522,7 +2509,6 @@ function vacuumAllLootToPlayer() {
   // pull everything close to player so it gets collected quickly.
   for (const g of gems) { g.x = player.x + rand(-8, 8); g.y = player.y + rand(-8, 8); }
   for (const c of chests) { c.x = player.x + rand(-18, 18); c.y = player.y + rand(-18, 18); }
-  for (const s of slotOrbs) { s.x = player.x + rand(-12, 12); s.y = player.y + rand(-12, 12); }
   for (const h of heals) { h.x = player.x + rand(-12, 12); h.y = player.y + rand(-12, 12); }
 }
 
@@ -2553,22 +2539,6 @@ function updateHeals(dt) {
       if (gained > 0) {
         toast.text = t('healPick', gained);
         toast.t = 1.6;
-      }
-      return;
-    }
-  }
-}
-
-function updateSlots(dt) {
-  for (let i = slotOrbs.length - 1; i >= 0; i--) {
-    const s = slotOrbs[i];
-    const d = dist(player.x, player.y, s.x, s.y);
-    if (d < player.r + s.r) {
-      slotOrbs.splice(i, 1);
-      if (player.weaponSlots < player.weaponSlotsMax) {
-        player.weaponSlots += 1;
-        toast.text = t('slotUp', player.weaponSlots);
-        toast.t = 2.0;
       }
       return;
     }
@@ -3285,16 +3255,9 @@ function weaponEnabledCount() {
 
 function tryEnableWeapon(key) {
   if (weapons[key].enabled) return true;
-
-  // if there's room, enable it
-  if (weaponEnabledCount() < player.weaponSlots) {
-    weapons[key].enabled = true;
-    return true;
-  }
-
-  // otherwise ask to replace
-  openReplaceWeaponModal(key);
-  return false;
+  // no slot limit: always enable
+  weapons[key].enabled = true;
+  return true;
 }
 
 function openChoiceModal(mode, title, poolBase) {
@@ -3560,13 +3523,6 @@ function draw() {
   for (const h of heals) {
     const [sx, sy] = worldToScreen(h.x, h.y);
     drawSprite(SPR.heal, sx, sy, { scale: 1.1, alpha: 0.98 });
-  }
-
-  // weapon slot orbs
-  for (const s of slotOrbs) {
-    const [sx, sy] = worldToScreen(s.x, s.y);
-    // reuse gold orb sprite for now
-    drawSprite(SPR.orbGold, sx, sy, { scale: 1.15, alpha: 0.95 });
   }
 
   // chests (make them obvious: bob + glow + light beam)
@@ -4087,9 +4043,6 @@ function updateUI() {
   ui.kills.textContent = String(state.kills);
   ui.time.textContent = formatTime(state.elapsed | 0);
 
-  // right HUD
-  if (ui.hudSlots) ui.hudSlots.textContent = `Slots: ${weaponEnabledCount()}/${player.weaponSlots} (Max ${player.weaponSlotsMax})`;
-
   if (ui.awardLine) {
     if (state.currentAwardLevel != null) {
       ui.awardLine.textContent = (lang === 'zh')
@@ -4233,7 +4186,6 @@ function loop(now) {
     updateEnemies(dt);
     updateVacuumGems(dt);
     updateHeals(dt);
-    updateSlots(dt);
     updateChests(dt);
     updateGems(dt);
   }
@@ -4250,7 +4202,6 @@ function resetRun() {
   enemies.length = 0;
   gems.length = 0;
   chests.length = 0;
-  slotOrbs.length = 0;
   vacuumGems.length = 0;
   heals.length = 0;
   effects.length = 0;
@@ -4287,8 +4238,6 @@ function resetRun() {
   player.xp = 0;
   player.xpNeed = 30;
   player.magnet = 70;
-  player.weaponSlots = 4;
-  player.weaponSlotsMax = 6;
 
   weapons.wand.enabled = true;
   weapons.wand.lvl = 1;
