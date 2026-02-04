@@ -1625,6 +1625,10 @@ function updateMeteor(dt) {
 function castFrostShockwave() {
   const w = weapons.frost;
   const [fx, fy] = forwardVec(player.dir);
+  const baseAng = Math.PI / 3; // 60°
+  const stepAng = Math.PI / 6; // +30° per frost level
+  const coneAng = clamp(baseAng + Math.max(0, (w.lvl - 1)) * stepAng, baseAng, Math.PI * 2);
+
   effects.push({
     type: 'cone',
     x: player.x,
@@ -1635,7 +1639,7 @@ function castFrostShockwave() {
     ttl: w.maxRadius / w.speed,
     r0: 0,
     r1: w.maxRadius,
-    ang: Math.PI * 0.55, // ~99° cone
+    ang: coneAng,
   });
 
   // collision handled in updateEffects per frame (expanding cone)
