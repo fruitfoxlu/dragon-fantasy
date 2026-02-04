@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v87';
+const BUILD = 'v88';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -81,6 +81,7 @@ const ui = {
   hudSlots: document.getElementById('hudSlots'),
   hudWeapons: document.getElementById('hudWeapons'),
   hudMagic: document.getElementById('hudMagic'),
+  hudChestHint: document.getElementById('hudChestHint'),
 };
 
 // ---------- helpers
@@ -1714,6 +1715,15 @@ function killEnemyAt(index) {
     // Normal mobs: small chance to drop a healing potion.
     if (Math.random() < 0.03) {
       heals.push({ x: e.x, y: e.y, r: 12, amount: 25 });
+    }
+
+    // Normal mobs: very low chance to drop a chest (magic-only chests; map capped to 4).
+    // Keep it low to preserve elite/boss value.
+    const chestChance = 0.002; // 0.2%
+    if (state.elapsed >= 60 && Math.random() < chestChance) {
+      // slight SFX cue so players notice it dropped
+      sfxPickup('reward');
+      pushChest(e.x + rand(-10, 10), e.y + rand(-10, 10), 12);
     }
   }
 
@@ -3505,10 +3515,32 @@ function draw() {
     drawSprite(SPR.orbGold, sx, sy, { scale: 1.15, alpha: 0.95 });
   }
 
-  // chests
+  // chests (make them obvious: bob + glow + light beam)
   for (const c of chests) {
     const [sx, sy] = worldToScreen(c.x, c.y);
-    drawSprite(SPR.chest, sx, sy, { scale: 1 });
+    const bob = Math.sin(state.elapsed * 3.2 + (c.x + c.y) * 0.01) * 3;
+
+    // glow ring
+    ctx.save();
+    ctx.globalAlpha = 0.35 + 0.25 * (0.5 + 0.5 * Math.sin(state.elapsed * 5));
+    ctx.fillStyle = '#ffd36a';
+    ctx.beginPath();
+    ctx.arc(sx, sy + bob + 10, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // vertical beam
+    ctx.save();
+    ctx.globalAlpha = 0.18 + 0.12 * (0.5 + 0.5 * Math.sin(state.elapsed * 4.1));
+    const grad = ctx.createLinearGradient(sx, sy - 90, sx, sy + 20);
+    grad.addColorStop(0, 'rgba(255,235,160,0)');
+    grad.addColorStop(0.45, 'rgba(255,235,160,0.55)');
+    grad.addColorStop(1, 'rgba(255,235,160,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(sx - 8, sy - 90, 16, 110);
+    ctx.restore();
+
+    drawSprite(SPR.chest, sx, sy + bob, { scale: 1.05 });
   }
 
   // orbit blades
@@ -4033,6 +4065,12 @@ function updateUI() {
       const lvl = weapons[k].lvl || 0;
       return `<div class="hudItem"><span class="n">${weaponLabel(k)}</span><span class="l">Lv.${lvl}</span></div>`;
     }).join('') || `<div class="hudLine">(none)</div>`;
+  }
+
+  // hint: chest count (so players remember to pick them up)
+  if (ui.hudChestHint) {
+    const n = chests.length;
+    ui.hudChestHint.textContent = n ? `Chest: ${n}` : '';
   }
 }
 
