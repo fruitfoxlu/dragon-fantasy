@@ -48,7 +48,8 @@ window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
-const BUILD = 'v119';
+const TEST = DEBUG || FAST;
+const BUILD = 'v120';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1017,6 +1018,51 @@ function xpGainMul(level) {
 }
 
 window.addEventListener('keydown', (e) => {
+  // TEST hotkeys (only when ?debug=1 or ?fast=1)
+  if (TEST) {
+    // Jump chapters quickly
+    if (e.code === 'BracketRight') {
+      e.preventDefault();
+      const target = (player.level < 15) ? 15 : (player.level < 30 ? 30 : 50);
+      while (player.level < target) {
+        player.xp = player.xpNeed;
+        checkLevelUp();
+        if (state.mode === 'levelup' || state.mode === 'chest') chooseUpgrade(0);
+      }
+      dbg('jump->Lv' + player.level);
+      return;
+    }
+    if (e.code === 'BracketLeft') {
+      e.preventDefault();
+      const target = (player.level >= 50) ? 30 : 15;
+      while (player.level < target) {
+        player.xp = player.xpNeed;
+        checkLevelUp();
+        if (state.mode === 'levelup' || state.mode === 'chest') chooseUpgrade(0);
+      }
+      dbg('jump->Lv' + player.level);
+      return;
+    }
+
+    // Spawn final boss duel (debug)
+    if (e.code === 'KeyB') {
+      e.preventDefault();
+      state.finalBossPending = true;
+      state.finalBossStarted = false;
+      startFinalBossDuel();
+      dbg('spawnFinalBossDuel');
+      return;
+    }
+
+    // Emergency clear (debug)
+    if (e.code === 'KeyK') {
+      e.preventDefault();
+      enemies.length = 0;
+      enemyBullets.length = 0;
+      dbg('clear enemies');
+      return;
+    }
+  }
   if (state.mode === 'start') {
     if (e.code === 'Enter' || e.code === 'Space') startGame();
     return;
@@ -4495,7 +4541,7 @@ function draw() {
       ctx.fillRect(10, view.h - 170, 170, 28);
       ctx.fillStyle = 'rgba(255,255,255,.96)';
       ctx.font = '14px ui-monospace, Menlo, monospace';
-      ctx.fillText('DEBUG ON (v14)', 18, view.h - 150);
+      ctx.fillText('DEBUG ON ' + BUILD + (FAST ? ' FAST' : '') + '  |  Lv ' + player.level, 18, view.h - 150);
 
       // red cross = screen center
       ctx.strokeStyle = 'rgba(255,80,80,.98)';
@@ -4537,6 +4583,17 @@ function draw() {
         16,
         view.h - 22
       );
+
+      // unlock status
+      const L = player.level || 1;
+      const uBoss = (L >= 25);
+      const uElite = (L >= 15);
+      const uShield = (L >= 15);
+      const uCav = (L >= 20);
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.fillRect(540, view.h - 44, 410, 34);
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.fillText('unlocks: elite ' + (uElite?'Y':'-') + '  boss ' + (uBoss?'Y':'-') + '  shield ' + (uShield?'Y':'-') + '  cav ' + (uCav?'Y':'-'), 546, view.h - 22);
 
       // rolling log
       const boxW = 520;
