@@ -47,7 +47,8 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v118';
+const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
+const BUILD = 'v119';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -2874,7 +2875,7 @@ function updateGems(dt) {
     }
 
     if (d < player.r + g.r) {
-      player.xp += g.xp;
+      player.xp += g.xp * (FAST ? 8 : 1);
       gems.splice(i, 1);
       sfxPickup('xp');
       checkLevelUp();
