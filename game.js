@@ -47,7 +47,7 @@ window.visualViewport?.addEventListener('resize', () => resizeCanvas());
 window.visualViewport?.addEventListener('scroll', () => resizeCanvas());
 resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const BUILD = 'v117';
+const BUILD = 'v118';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -193,13 +193,28 @@ function weaponLabel(key) {
 }
 
 function nextDragonUpgradeId() {
-  // sequence: (start slow, 2 crosses) -> speed -> +1 cross -> speed -> +1 cross ... until 6
+  // Dragon Soul upgrades are a strict sequence, up to MAGIC_CAP.
   if (!weapons.dragon.enabled) return 'unlock_dragon';
   const w = weapons.dragon;
-  if (w.crosses >= 6) return null;
   const stage = w.stage || 0;
-  // even stages: speed, odd stages: more
-  return (stage % 2 === 0) ? `dragon_speed_${stage/2+1}` : `dragon_more_${(stage+1)/2}`;
+
+  const seq = [
+    'dragon_speed_1','dragon_more_1',
+    'dragon_speed_2','dragon_more_2',
+    'dragon_speed_3','dragon_more_3',
+    'dragon_speed_4','dragon_more_4',
+    'dragon_speed_5','dragon_more_5',
+    'dragon_speed_6','dragon_more_6',
+    'dragon_speed_7','dragon_more_7',
+    'dragon_speed_8','dragon_more_8',
+    'dragon_speed_9','dragon_more_9',
+    'dragon_speed_10','dragon_more_10',
+  ];
+
+  // stage==0 means next is seq[0] (speed_1)
+  if (stage >= seq.length) return null;
+  if (magicLvl('dragon') >= MAGIC_CAP) return null;
+  return seq[stage];
 }
 
 function applyStaticI18n() {
