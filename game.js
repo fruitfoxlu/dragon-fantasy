@@ -965,6 +965,52 @@ function tintSprite(img, mul = [1, 1, 1], add = [0, 0, 0]) {
   return c;
 }
 
+// Lava floor tiles (for Lv30 biome). Keep pixel-art simple but with multiple natural-looking swatches.
+SPR.lavaRockA = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#1a1412');
+  px(g, 0, 0, 32, 1, 'rgba(0,0,0,.35)');
+  px(g, 0, 31, 32, 1, 'rgba(255,120,40,.08)');
+  for (let i = 0; i < 18; i++) px(g, (i * 7) % 32, (i * 11) % 32, 2, 1, 'rgba(80,60,55,.22)');
+});
+SPR.lavaRockB = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#201815');
+  px(g, 0, 0, 32, 1, 'rgba(0,0,0,.35)');
+  for (let i = 0; i < 16; i++) px(g, (i * 9) % 32, (i * 13) % 32, 2, 1, 'rgba(90,70,62,.22)');
+});
+SPR.lavaDirtA = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#2a1b12');
+  for (let i = 0; i < 20; i++) px(g, (i * 5) % 32, (i * 17) % 32, 1, 1, 'rgba(150,90,50,.18)');
+});
+SPR.lavaDirtB = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#2f1e14');
+  px(g, 6, 8, 10, 6, 'rgba(120,70,40,.18)');
+  px(g, 18, 18, 10, 6, 'rgba(120,70,40,.18)');
+});
+SPR.lavaMudA = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#2a1211');
+  for (let i = 0; i < 14; i++) px(g, (i * 13) % 32, (i * 7) % 32, 2, 1, 'rgba(170,60,45,.14)');
+});
+SPR.lavaMudB = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#2d1513');
+  px(g, 4, 6, 12, 4, 'rgba(160,55,45,.12)');
+  px(g, 16, 20, 10, 4, 'rgba(160,55,45,.12)');
+});
+SPR.magmaA = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#3a120a');
+  px(g, 0, 0, 32, 32, 'rgba(255,80,20,.25)');
+  // bright molten veins
+  px(g, 2, 10, 28, 1, 'rgba(255,210,90,.55)');
+  px(g, 6, 18, 20, 1, 'rgba(255,160,60,.45)');
+  px(g, 10, 24, 14, 1, 'rgba(255,120,40,.40)');
+});
+SPR.magmaB = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#361008');
+  px(g, 0, 0, 32, 32, 'rgba(255,70,15,.22)');
+  px(g, 4, 8, 24, 1, 'rgba(255,200,80,.50)');
+  px(g, 8, 16, 16, 1, 'rgba(255,150,55,.42)');
+  px(g, 6, 26, 20, 1, 'rgba(255,110,35,.36)');
+});
+
 // Snow floor tiles (draw directly, so they render immediately)
 SPR.snowGrassA = makeSprite(32, 32, (g) => {
   px(g, 0, 0, 32, 32, '#eaf6ff');
@@ -1005,9 +1051,20 @@ function tileKind(tx, ty) {
   // We keep snowStartAt as the trigger flag, but DO NOT swap floor tiles to snow.
   const useSnow = false;
 
+  // Lv30 lava biome: swap floor tiles to a more varied volcanic palette.
+  const lavaP = (state.lavaStartAt != null) ? clamp((state.elapsed - state.lavaStartAt) / 18, 0, 1) : 0;
+  const lavaOn = lavaP > 0.02;
+
   if (onPath) {
     const k = (h & 1) ? 'pathA' : 'pathB';
-    return useSnow ? ((h & 1) ? 'snowPathA' : 'snowPathB') : k;
+    if (useSnow) return (h & 1) ? 'snowPathA' : 'snowPathB';
+    if (lavaOn) {
+      // dark "basalt" path with occasional molten seams
+      const seam = ((h >>> 16) & 255) / 255;
+      const useMagma = seam < (0.10 + 0.20 * lavaP);
+      return useMagma ? ((h & 1) ? 'magmaA' : 'magmaB') : ((h & 1) ? 'lavaRockA' : 'lavaRockB');
+    }
+    return k;
   }
 
   // ruins: clustered stones
@@ -1015,7 +1072,26 @@ function tileKind(tx, ty) {
   if (cluster > 0.82 && (h & 7) === 0) return (h & 1) ? 'stoneA' : 'stoneB';
 
   const g = (h & 1) ? 'grassA' : 'grassB';
-  return useSnow ? ((h & 1) ? 'snowGrassA' : 'snowGrassB') : g;
+  if (useSnow) return (h & 1) ? 'snowGrassA' : 'snowGrassB';
+
+  if (lavaOn) {
+    // Natural-ish patches using low-frequency clusters.
+    const c1 = (hash2((tx / 4) | 0, (ty / 4) | 0) & 255) / 255;
+    const c2 = (hash2((tx / 7) | 0, (ty / 7) | 0) & 255) / 255;
+    const r = ((h >>> 8) & 255) / 255;
+
+    // magma rivers / pools (rarer, brighter)
+    if (c1 > (0.92 - 0.18 * lavaP) && (r < (0.55 + 0.25 * lavaP))) return (h & 1) ? 'magmaA' : 'magmaB';
+
+    // stone/basalt areas
+    if (c2 > 0.68) return (h & 1) ? 'lavaRockA' : 'lavaRockB';
+
+    // muddy / dirty variations
+    if (c1 > 0.55) return (h & 1) ? 'lavaMudA' : 'lavaMudB';
+    return (h & 1) ? 'lavaDirtA' : 'lavaDirtB';
+  }
+
+  return g;
 }
 
 function decorKind(tx, ty) {
@@ -4040,56 +4116,71 @@ function draw() {
   }
 
   // Biome: lava / geothermal transition (starts at Lv30, fades in over ~85s)
-  // Make it VERY visible: warm tint + cracks + stronger vignette + embers.
+  // Make it bright, flame-like, and clearly different.
   if (state.lavaStartAt != null) {
     const p = clamp((state.elapsed - state.lavaStartAt) / 85, 0, 1);
 
     ctx.save();
 
-    // cycle lava mood: A -> B -> C -> A (every ~7s)
-    const lavaIdx = Math.floor(((state.elapsed - state.lavaStartAt) / 7)) % 3;
-    const lavaTint = (lavaIdx === 0) ? '#ff5a2a' : (lavaIdx === 1 ? '#ff2f1e' : '#ff7a2a');
-    const vigEdge = (lavaIdx === 0) ? 'rgba(25,0,35,0.80)' : (lavaIdx === 1 ? 'rgba(20,0,20,0.90)' : 'rgba(28,0,18,0.85)');
+    // cycle lava mood: A -> B -> C -> A (every ~6s)
+    const lavaIdx = Math.floor(((state.elapsed - state.lavaStartAt) / 6)) % 3;
+    const lavaTint = (lavaIdx === 0) ? '#ff4a1e' : (lavaIdx === 1 ? '#ff2a12' : '#ff6a22');
+    const vigEdge = (lavaIdx === 0) ? 'rgba(35,0,10,0.78)' : (lavaIdx === 1 ? 'rgba(30,0,8,0.86)' : 'rgba(40,0,6,0.80)');
 
-    // warm tint overlay (does not affect UI)
-    ctx.globalAlpha = 0.10 + 0.42 * p;
+    // strong warm tint
+    ctx.globalAlpha = 0.18 + 0.58 * p;
     ctx.fillStyle = lavaTint;
     ctx.fillRect(0, 0, view.w, view.h);
 
-    // heavy vignette
-    ctx.globalAlpha = 0.10 + 0.35 * p;
-    const vg = ctx.createRadialGradient(view.w/2, view.h/2, 40, view.w/2, view.h/2, Math.max(view.w, view.h) * 0.8);
+    // flame glow bloom (screen blend) to make highlights pop
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.08 + 0.22 * p;
+    const glow = ctx.createRadialGradient(view.w/2, view.h/2, 20, view.w/2, view.h/2, Math.max(view.w, view.h) * 0.65);
+    glow.addColorStop(0, 'rgba(255,190,90,0.55)');
+    glow.addColorStop(0.55, 'rgba(255,90,40,0.22)');
+    glow.addColorStop(1, 'rgba(255,40,10,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, view.w, view.h);
+
+    // restore normal blend
+    ctx.globalCompositeOperation = 'source-over';
+
+    // vignette (keep mood, but not too dark)
+    ctx.globalAlpha = 0.06 + 0.22 * p;
+    const vg = ctx.createRadialGradient(view.w/2, view.h/2, 60, view.w/2, view.h/2, Math.max(view.w, view.h) * 0.9);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, vigEdge);
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, view.w, view.h);
 
-    // lava cracks (tile-stable glow lines)
-    ctx.globalAlpha = 0.08 + 0.28 * p;
-    ctx.strokeStyle = 'rgba(255,210,80,.85)';
-    ctx.lineWidth = 2;
+    // bright cracks / seams (tile-stable glow lines) with a subtle pulse
+    const pulse = 0.65 + 0.35 * (0.5 + 0.5 * Math.sin(state.elapsed * 2.8));
+    ctx.globalAlpha = (0.12 + 0.46 * p) * pulse;
+    ctx.strokeStyle = 'rgba(255,220,120,.95)';
+    ctx.lineWidth = 3;
     for (let ty = startY; ty <= endY; ty++) {
       for (let tx = startX; tx <= endX; tx++) {
         const h = hash2(tx, ty);
-        if ((h & 63) === 0) {
+        if ((h & 31) === 0) {
           const sx = tx * tileSize - state.camera.x;
           const sy = ty * tileSize - state.camera.y;
           ctx.beginPath();
-          ctx.moveTo(sx + 4, sy + 6 + ((h>>>8)&7));
-          ctx.lineTo(sx + 28, sy + 26 - ((h>>>12)&7));
+          ctx.moveTo(sx + 3, sy + 5 + ((h>>>8)&7));
+          ctx.lineTo(sx + 29, sy + 27 - ((h>>>12)&7));
           ctx.stroke();
         }
       }
     }
     ctx.lineWidth = 1;
 
-    // embers
-    ctx.globalAlpha = 0.10 + 0.28 * p;
-    for (let i = 0; i < Math.floor(90 * p); i++) {
-      const x = (i * 83 + Math.floor(state.elapsed * 60)) % (view.w + 80) - 40;
-      const y = (i * 41 + Math.floor(state.elapsed * 28)) % (view.h + 80) - 40;
-      ctx.fillStyle = (i & 1) ? 'rgba(255,190,80,.90)' : 'rgba(255,90,40,.85)';
-      ctx.fillRect(x, y, 2, 2);
+    // embers (more + brighter)
+    ctx.globalAlpha = 0.14 + 0.38 * p;
+    for (let i = 0; i < Math.floor(180 * p); i++) {
+      const x = (i * 83 + Math.floor(state.elapsed * 78)) % (view.w + 120) - 60;
+      const y = (i * 41 + Math.floor(state.elapsed * 34)) % (view.h + 120) - 60;
+      ctx.fillStyle = (i % 3 === 0) ? 'rgba(255,220,120,.95)' : ((i & 1) ? 'rgba(255,160,60,.92)' : 'rgba(255,70,30,.88)');
+      const r = (i % 9 === 0) ? 3 : 2;
+      ctx.fillRect(x, y, r, r);
     }
 
     ctx.restore();
