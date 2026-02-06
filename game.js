@@ -2437,34 +2437,42 @@ function updateDragonSoul(dt) {
   const w = weapons.dragon;
   if (!w.enabled) return;
 
+  // Safety + perf guard: prevent accidental huge/NaN crosses from hard-freezing the game.
+  const n = Math.max(0, Math.min(24, (w.crosses | 0) || 0));
+  if (n <= 0) return;
+
   // drift rotation speed a bit for "irregular" feel
   w.ang += (w.angSpeed + Math.sin(state.elapsed * 1.7) * w.jitter) * dt;
 
+  // tick cooldown per enemy
   for (const e of enemies) {
     e.dragonHitCd = Math.max(0, (e.dragonHitCd || 0) - dt);
   }
 
-  for (let i = 0; i < w.crosses; i++) {
-    const u = w.ang + i * (Math.PI * 2 / w.crosses);
+  const reach = ((w.crossSize || 42) * 0.9);
+
+  for (let i = 0; i < n; i++) {
+    const u = w.ang + i * (Math.PI * 2 / n);
     const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 10;
     // Lemniscate / infinity path (Gerono): x=a*sin(t), y=b*sin(2t)
     const cx = player.x + Math.sin(u) * rad;
     const cy = player.y + Math.sin(2 * u) * rad * 0.55;
 
-    // damage enemies in a small AoE around cross
+    // damage enemies in a small AoE around cross (use squared distance; avoid sqrt)
     for (let ei = enemies.length - 1; ei >= 0; ei--) {
       const e = enemies[ei];
-      const d = dist(cx, cy, e.x, e.y);
-      if (d < (w.crossSize * 0.9) + e.r) {
-        if ((e.dragonHitCd || 0) <= 0) {
-          damageEnemy(e, w.damage, player.x, player.y);
-          e.dragonHitCd = w.tick;
-          // knockback
-          const [nx, ny] = norm(e.x - player.x, e.y - player.y);
-          e.vx += nx * 180;
-          e.vy += ny * 180;
-          if (e.hp <= 0) killEnemyAt(ei);
-        }
+      if ((e.dragonHitCd || 0) > 0) continue;
+      const rr = reach + e.r;
+      const dx = cx - e.x;
+      const dy = cy - e.y;
+      if (dx * dx + dy * dy < rr * rr) {
+        damageEnemy(e, w.damage, player.x, player.y);
+        e.dragonHitCd = w.tick;
+        // knockback
+        const [nx, ny] = norm(e.x - player.x, e.y - player.y);
+        e.vx += nx * 180;
+        e.vy += ny * 180;
+        if (e.hp <= 0) killEnemyAt(ei);
       }
     }
   }
@@ -4312,13 +4320,16 @@ function draw() {
   // dragon soul crosses
   if (weapons.dragon.enabled) {
     const w = weapons.dragon;
-    for (let i = 0; i < w.crosses; i++) {
-      const u = w.ang + i * (Math.PI * 2 / w.crosses);
-      const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 10;
-      const bx = player.x + Math.sin(u) * rad;
-      const by = player.y + Math.sin(2 * u) * rad * 0.55;
-      const [sx, sy] = worldToScreen(bx, by);
-      drawSprite(SPR.dragonCross, sx, sy, { scale: 1.0, rot: u, alpha: 0.95 });
+    const n = Math.max(0, Math.min(24, (w.crosses | 0) || 0));
+    if (n > 0) {
+      for (let i = 0; i < n; i++) {
+        const u = w.ang + i * (Math.PI * 2 / n);
+        const rad = w.radius + Math.sin(state.elapsed * 2.3 + i) * 10;
+        const bx = player.x + Math.sin(u) * rad;
+        const by = player.y + Math.sin(2 * u) * rad * 0.55;
+        const [sx, sy] = worldToScreen(bx, by);
+        drawSprite(SPR.dragonCross, sx, sy, { scale: 1.0, rot: u, alpha: 0.95 });
+      }
     }
   }
 
