@@ -2266,7 +2266,7 @@ function applyMeteorImpact(x, y) {
     const e = enemies[i];
     const d = dist(x, y, e.x, e.y);
     if (d <= w.impactRadius + e.r) {
-      damageEnemy(e, w.impactDamage, x, y);
+      damageEnemy(e, w.impactDamage * 2, x, y);
       // knockback outward
       const [nx, ny] = norm(e.x - x, e.y - y);
       e.vx += nx * 220;
@@ -2285,7 +2285,7 @@ function applyMeteorImpact(x, y) {
     t: 0,
     ttl: w.burnDuration,
     radius: w.burnRadius,
-    dps: w.burnDps,
+    dps: w.burnDps * 2,
   });
 }
 
@@ -3392,9 +3392,9 @@ const UPGRADE_POOL = [
   },
   {
     id: 'wand_proj',
-    title: 'Arcane Wand：額外飛彈 +1',
-    desc: '同時多打一發（散射）。',
-    apply() { weapons.wand.projectiles += 1; weapons.wand.lvl += 1; }
+    title: 'Arcane Wand：額外飛彈 +3',
+    desc: '每次發射多 3 發（散射）。',
+    apply() { weapons.wand.projectiles += 3; weapons.wand.lvl += 1; }
   },
 
   // Bow
@@ -3579,9 +3579,9 @@ const UPGRADE_POOL = [
   },
   {
     id: 'magnet',
-    title: '龍之召喚：拾取範圍 +50',
-    desc: '更容易吸到經驗之魂。',
-    apply() { player.magnet += 50; player.passives.magnet = (player.passives.magnet || 0) + 1; }
+    title: '龍之召喚：拾取範圍 ×2',
+    desc: '每升一級，吸經驗球距離加倍。',
+    apply() { player.magnet *= 2; player.passives.magnet = (player.passives.magnet || 0) + 1; }
   },
 ];
 
