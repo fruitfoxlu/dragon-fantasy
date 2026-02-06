@@ -1451,12 +1451,14 @@ const weapons = {
     cd: 0,
     baseCooldown: 2.4,
     impactDamage: 44,
-    impactRadius: 90,
-    burnRadius: 80,
+    impactRadius: 180,
+    burnRadius: 160,
     burnDps: 16,
     burnDuration: 2.6,
     delay: 0.6,
     scatter: 320, // target radius around player
+    countBase: 4,
+    countPerLvl: 2,
   },
 
   frost: {
@@ -2325,23 +2327,24 @@ function updateChainLightning(dt) {
   w.cd = cdTarget;
 }
 
-function spawnMeteor() {
+function spawnMeteor(tx = null, ty = null) {
   const w = weapons.meteor;
 
-  let tx, ty;
-  if (w.followTrail && playerTrail.length) {
-    // target a previous footstep (about trailDelay seconds ago)
-    const targetT = state.elapsed - (w.trailDelay || 1.0);
-    let best = playerTrail[0];
-    for (let i = 0; i < playerTrail.length; i++) {
-      const p = playerTrail[i];
-      if (p.t <= targetT) best = p; else break;
+  if (tx == null || ty == null) {
+    if (w.followTrail && playerTrail.length) {
+      // target a previous footstep (about trailDelay seconds ago)
+      const targetT = state.elapsed - (w.trailDelay || 1.0);
+      let best = playerTrail[0];
+      for (let i = 0; i < playerTrail.length; i++) {
+        const p = playerTrail[i];
+        if (p.t <= targetT) best = p; else break;
+      }
+      tx = best.x;
+      ty = best.y;
+    } else {
+      tx = player.x + rand(-w.scatter, w.scatter);
+      ty = player.y + rand(-w.scatter, w.scatter);
     }
-    tx = best.x;
-    ty = best.y;
-  } else {
-    tx = player.x + rand(-w.scatter, w.scatter);
-    ty = player.y + rand(-w.scatter, w.scatter);
   }
 
   effects.push({
@@ -2394,7 +2397,20 @@ function updateMeteor(dt) {
   if (w.cd > 0) return;
 
   sfxCast('meteor');
-  spawnMeteor();
+
+  // Meteor count scaling: base 4, +2 per level (as requested)
+  const lvl = Math.max(1, (w.lvl | 0) || 1);
+  const base = (w.countBase ?? 4);
+  const per = (w.countPerLvl ?? 2);
+  const count = Math.max(1, base + (lvl - 1) * per);
+
+  for (let i = 0; i < count; i++) {
+    // scatter each meteor a bit so they don't all stack on the same point
+    const tx = player.x + rand(-w.scatter, w.scatter);
+    const ty = player.y + rand(-w.scatter, w.scatter);
+    spawnMeteor(tx, ty);
+  }
+
   w.cd = w.baseCooldown;
 }
 
