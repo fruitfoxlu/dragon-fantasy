@@ -1494,6 +1494,9 @@ const weapons = {
 
 const bullets = [];       // player bullets {x,y,vx,vy,r, dmg, pierce, life, color}
 const enemyBullets = [];  // enemy bullets  {x,y,vx,vy,r, dmg, life}
+
+// Global cap to prevent runaway counts (perf/crash on browser/mobile)
+const MAX_ENEMIES = 260;
 let enemyIdSeq = 1;
 const enemies = [];       // {id,x,y,r, hp, speed, touchDmg, vx,vy, frozenUntil, burnUntil, burnDps, bladeHitCd, type, elite, shootCd, shootBase, shootSpeed, shootDmg}
 const gems = [];          // {x,y,r, xp}
@@ -1683,6 +1686,8 @@ function spawnShieldWall(side) {
 
 function spawnEnemy() {
 
+  if (enemies.length >= MAX_ENEMIES) return;
+
   const margin = 80;
   const w = view.w, h = view.h;
   const side = (Math.random() * 4) | 0;
@@ -1808,6 +1813,7 @@ function spawnEnemy() {
 
 function spawnBoss() {
   // Big Boss: tougher, unique attacks, better loot.
+  if (enemies.length >= MAX_ENEMIES) return;
   // Two variants: normal (gold) and purple (harder, double treasure).
   const margin = 120;
   const w = view.w, h = view.h;
@@ -4977,7 +4983,6 @@ function loop(now) {
 
       // Formation spawns (LEVEL gate; squads only)
       // IMPORTANT: cap spawns to avoid runaway enemy counts (crash / freeze on mobile).
-      const MAX_ENEMIES = 260;
 
       // Shield wall unlock at Lv15
       if (player.level >= 15 && state.elapsed >= state.nextShieldWallAt) {
