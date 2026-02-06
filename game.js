@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v120';
+const BUILD = 'v121';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -2849,6 +2849,45 @@ function updateEnemies(dt) {
     }
 
     if (player.hp <= 0) {
+      // During final boss duel, treat player death as game-over summary (so we always reach an end screen).
+      if (state.phase === 'final') {
+        if (state.phase !== 'victory') {
+          state.phase = 'gameover';
+          state.runEndedAt = state.elapsed;
+          state.mode = 'summary';
+
+          ui.levelup?.classList.add('hidden');
+          ui.start?.classList.add('hidden');
+
+          const timeSec = Math.max(0, state.runEndedAt || state.elapsed);
+          const score = Math.floor(state.kills * 10 + timeSec * 2 + player.level * 50);
+          const lines = (items) => items.length ? items.map(s => `• ${s}`).join('<br/>') : (lang === 'zh' ? '（無）' : '(none)');
+
+          const ach = [];
+          ach.push((lang === 'zh') ? '殞落：倒在最終決鬥' : 'Fallen: Defeated in the final duel');
+
+          const wLines = WEAPON_KEYS.filter(k => weapons[k].enabled).map(k => `${weaponLabel(k)} Lv${weapons[k].lvl || 0}`);
+          const mLines = MAGIC_KEYS.filter(k => weapons[k].enabled).map(k => `${weaponLabel(k)} Lv${weapons[k].lvl || 0}`);
+          const p = player.passives || {};
+          const pLines = [
+            (lang === 'zh') ? `生命 Lv${p.hp || 0}` : `HP Lv${p.hp || 0}`,
+            (lang === 'zh') ? `速度 Lv${p.speed || 0}` : `Speed Lv${p.speed || 0}`,
+            (lang === 'zh') ? `磁力 Lv${p.magnet || 0}` : `Magnet Lv${p.magnet || 0}`,
+          ];
+
+          if (ui.summaryTitle) ui.summaryTitle.textContent = (lang === 'zh') ? '冒險結束' : 'Run Over';
+          if (ui.summaryScore) ui.summaryScore.textContent = (lang === 'zh') ? `分數：${score}（擊殺 ${state.kills} · ${formatTime(timeSec | 0)} · Lv${player.level}）` : `Score: ${score} (Kills ${state.kills} · ${formatTime(timeSec | 0)} · Lv${player.level})`;
+          if (ui.summaryAchievements) ui.summaryAchievements.innerHTML = `<div class="summaryHdr">${(lang === 'zh') ? '結果' : 'Result'}</div>${lines(ach)}`;
+          if (ui.summaryWeapons) ui.summaryWeapons.innerHTML = lines(wLines);
+          if (ui.summaryMagic) ui.summaryMagic.innerHTML = lines(mLines);
+          if (ui.summaryPassives) ui.summaryPassives.innerHTML = lines(pLines);
+
+          ui.summary?.classList.remove('hidden');
+          if (ui.summaryHint) ui.summaryHint.textContent = (lang === 'zh') ? '你可以按 Restart 再試一次。' : 'Press Restart to try again.';
+        }
+        return;
+      }
+
       if (state.mode !== 'dead') sfxGameOver();
       state.mode = 'dead';
     }
