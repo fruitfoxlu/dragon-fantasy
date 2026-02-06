@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v130';
+const BUILD = 'v131';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1887,7 +1887,7 @@ function spawnFinalBoss() {
     x: sx,
     y: sy,
     r: rr,
-    hp: 54000,
+    hp: 54000 * 10,
     speed: 72,
     touchDmg: 48,
     vx: 0,
@@ -2383,7 +2383,7 @@ function applyMeteorImpact(x, y) {
     const e = enemies[i];
     const d = dist(x, y, e.x, e.y);
     if (d <= w.impactRadius + e.r) {
-      damageEnemy(e, w.impactDamage * 2, x, y);
+      damageEnemy(e, w.impactDamage, x, y);
       // knockback outward
       const [nx, ny] = norm(e.x - x, e.y - y);
       e.vx += nx * 220;
@@ -2402,7 +2402,7 @@ function applyMeteorImpact(x, y) {
     t: 0,
     ttl: w.burnDuration,
     radius: w.burnRadius,
-    dps: w.burnDps * 2,
+    dps: w.burnDps,
   });
 }
 
