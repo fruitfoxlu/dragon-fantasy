@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v131';
+const BUILD = 'v132';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -137,6 +137,7 @@ const I18N = {
     liPause: '<strong>P</strong> Pause',
     startBtn: 'Start Adventure',
     startHint: 'Hotkeys: Enter / Space',
+    choiceHint: 'Hotkeys: 1 / 2 / 3',
     pauseBtn: 'Pause',
 
     w_wand: 'Arcane Wand',
@@ -169,6 +170,7 @@ const I18N = {
     liPause: '<strong>P</strong> 暫停',
     startBtn: '開始冒險',
     startHint: '快捷鍵：Enter / Space',
+    choiceHint: '快捷鍵：1 / 2 / 3',
     pauseBtn: '暫停',
 
     w_wand: '秘法魔杖',
@@ -222,6 +224,58 @@ function nextDragonUpgradeId() {
   return seq[stage];
 }
 
+function autoEnUpgradeText(s) {
+  if (!s || typeof s !== 'string') return s;
+  // If it looks mostly ASCII, keep it.
+  if (/^[\x00-\x7F\s\-+%:()/.•·]+$/.test(s)) return s;
+
+  // Lightweight mapping (good enough for UI; not perfect translation).
+  const map = [
+    ['：', ': '],
+    ['（', ' ('],
+    ['）', ')'],
+    ['隕石術', 'Meteor'],
+    ['雷電鏈', 'Chain Lightning'],
+    ['冰凍衝擊波', 'Frost Shockwave'],
+    ['聖水', 'Holy Water'],
+    ['秘法魔杖', 'Arcane Wand'],
+    ['龍焰弓', 'Dragon Bow'],
+    ['迴旋斬', 'Whirling Blades'],
+    ['龍之召喚', 'Dragon Call'],
+    ['解鎖', 'Unlock'],
+    ['傷害', 'Damage'],
+    ['威力', 'Power'],
+    ['冷卻', 'Cooldown'],
+    ['爆炸半徑', 'Impact Radius'],
+    ['燃燒', 'Burn'],
+    ['燃燒傷害', 'Burn Damage'],
+    ['燃燒持續傷害', 'Burn DoT'],
+    ['追蹤腳步', 'Follow Trail'],
+    ['延遲', 'Delay'],
+    ['旋轉速度', 'Spin Speed'],
+    ['轉速', 'Spin Speed'],
+    ['穿透', 'Pierce'],
+    ['額外飛彈', 'Projectiles'],
+    ['施法速度', 'Cast Speed'],
+    ['移動速度', 'Move Speed'],
+    ['最大 HP', 'Max HP'],
+    ['數量', 'Count'],
+    ['拾取範圍', 'Pickup Range'],
+    ['更常', 'More frequent'],
+    ['更大範圍', 'Larger area'],
+    ['更痛', 'Stronger'],
+    ['控場', 'Control'],
+    ['更快', 'Faster'],
+    ['更久', 'Longer'],
+  ];
+
+  let out = s;
+  for (const [a, b] of map) out = out.split(a).join(b);
+  // remove leftover CJK punctuation/spaces a bit
+  out = out.replace(/\s+/g, ' ').trim();
+  return out;
+}
+
 function applyStaticI18n() {
   const set = (id, html) => {
     const el = document.getElementById(id);
@@ -244,6 +298,7 @@ function applyStaticI18n() {
   set('liPause', t('liPause'));
   setText('startBtn', t('startBtn'));
   setText('startHint', t('startHint'));
+  setText('choiceHint', t('choiceHint'));
   if (ui.pauseBtn) ui.pauseBtn.textContent = t('pauseBtn');
 }
 
@@ -3910,7 +3965,11 @@ function openChest() {
     const desc = (typeof u.desc === 'function')
       ? u.desc()
       : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
-    div.innerHTML = `<div class="t">${idx + 1}. ${title}</div><div class="d">${desc}</div>`;
+
+    const title2 = (lang === 'en') ? autoEnUpgradeText(title) : title;
+    const desc2  = (lang === 'en') ? autoEnUpgradeText(desc)  : desc;
+
+    div.innerHTML = `<div class="t">${idx + 1}. ${title2}</div><div class="d">${desc2}</div>`;
     div.addEventListener('click', () => chooseUpgrade(idx));
     ui.choices.appendChild(div);
   });
@@ -3954,7 +4013,11 @@ function openReplaceWeaponModal(newWeaponKey) {
     const desc = (typeof u.desc === 'function')
       ? u.desc()
       : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
-    div.innerHTML = `<div class="t">${idx + 1}. ${title}</div><div class="d">${desc}</div>`;
+
+    const title2 = (lang === 'en') ? autoEnUpgradeText(title) : title;
+    const desc2  = (lang === 'en') ? autoEnUpgradeText(desc)  : desc;
+
+    div.innerHTML = `<div class="t">${idx + 1}. ${title2}</div><div class="d">${desc2}</div>`;
     div.addEventListener('click', () => chooseUpgrade(idx));
     ui.choices.appendChild(div);
   });
@@ -4079,7 +4142,11 @@ function openChoiceModal(mode, title, poolBase) {
     const desc = (typeof u.desc === 'function')
       ? u.desc()
       : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
-    div.innerHTML = `<div class="t">${idx + 1}. ${title}</div><div class="d">${desc}</div>`;
+
+    const title2 = (lang === 'en') ? autoEnUpgradeText(title) : title;
+    const desc2  = (lang === 'en') ? autoEnUpgradeText(desc)  : desc;
+
+    div.innerHTML = `<div class="t">${idx + 1}. ${title2}</div><div class="d">${desc2}</div>`;
     div.addEventListener('click', () => chooseUpgrade(idx));
     ui.choices.appendChild(div);
   });
