@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v122';
+const BUILD = 'v123';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -942,6 +942,36 @@ const SPR = {
   }),
 };
 
+// --- biome tile variants (snow should affect FLOOR only)
+function tintSprite(img, mul = [1, 1, 1], add = [0, 0, 0]) {
+  // Create a tinted copy of an existing sprite image.
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.drawImage(img, 0, 0);
+  const im = g.getImageData(0, 0, c.width, c.height);
+  const d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3];
+    if (!a) continue;
+    d[i + 0] = clamp((d[i + 0] * mul[0] + add[0]), 0, 255);
+    d[i + 1] = clamp((d[i + 1] * mul[1] + add[1]), 0, 255);
+    d[i + 2] = clamp((d[i + 2] * mul[2] + add[2]), 0, 255);
+  }
+  g.putImageData(im, 0, 0);
+  const out = new Image();
+  out.src = c.toDataURL();
+  return out;
+}
+
+// Snow floor tiles (keep outlines, but shift hues brighter/cooler)
+SPR.snowGrassA = tintSprite(SPR.grassA, [0.65, 0.85, 1.05], [70, 70, 70]);
+SPR.snowGrassB = tintSprite(SPR.grassB, [0.65, 0.85, 1.05], [70, 70, 70]);
+SPR.snowPathA  = tintSprite(SPR.pathA,  [0.75, 0.85, 1.00], [55, 55, 60]);
+SPR.snowPathB  = tintSprite(SPR.pathB,  [0.75, 0.85, 1.00], [55, 55, 60]);
+
 function tileKind(tx, ty) {
   // Two winding paths + occasional stone ruins patches.
   const h = hash2(tx, ty);
@@ -950,13 +980,22 @@ function tileKind(tx, ty) {
   const y2 = Math.floor(ty * 0.45 + Math.sin(tx * 0.22 + 2.2) * 4);
   const onPath = (Math.abs(ty - y1) <= 1) || (Math.abs(ty - y2) <= 1);
 
-  if (onPath) return (h & 1) ? 'pathA' : 'pathB';
+  // Snow: only change the FLOOR tiles (do NOT wash out units/UI)
+  const snowP = (state.snowStartAt != null) ? clamp((state.elapsed - state.snowStartAt) / 35, 0, 1) : 0;
+  const snowRoll = ((h >>> 8) & 255) / 255;
+  const useSnow = snowP > 0 && snowRoll < (0.92 * snowP);
+
+  if (onPath) {
+    const k = (h & 1) ? 'pathA' : 'pathB';
+    return useSnow ? ((h & 1) ? 'snowPathA' : 'snowPathB') : k;
+  }
 
   // ruins: clustered stones
   const cluster = ((hash2((tx / 3) | 0, (ty / 3) | 0) & 255) / 255);
   if (cluster > 0.82 && (h & 7) === 0) return (h & 1) ? 'stoneA' : 'stoneB';
 
-  return (h & 1) ? 'grassA' : 'grassB';
+  const g = (h & 1) ? 'grassA' : 'grassB';
+  return useSnow ? ((h & 1) ? 'snowGrassA' : 'snowGrassB') : g;
 }
 
 function decorKind(tx, ty) {
@@ -3953,29 +3992,13 @@ function draw() {
   if (state.snowStartAt != null) {
     const p = clamp((state.elapsed - state.snowStartAt) / 80, 0, 1);
 
-    // strong cool tint
+    // Snow should NOT wash out everything.
+    // The floor is already swapped to snow tiles in tileKind(); here we only add subtle particles.
     ctx.save();
-    ctx.globalAlpha = 0.12 + 0.38 * p;
-    ctx.fillStyle = '#d9f0ff';
-    ctx.fillRect(0, 0, view.w, view.h);
-
-    // snowy patches (3x3 tiles) using coarse noise
-    ctx.globalAlpha = 0.14 + 0.30 * p;
-    ctx.fillStyle = 'rgba(255,255,255,.92)';
-    for (let ty = startY; ty <= endY; ty++) {
-      for (let tx = startX; tx <= endX; tx++) {
-        const hh = hash2((tx/3)|0, (ty/3)|0);
-        if ((hh & 31) === 0) {
-          const sx0 = (tx * tileSize) - state.camera.x;
-          const sy0 = (ty * tileSize) - state.camera.y;
-          ctx.fillRect(sx0, sy0, tileSize, tileSize);
-        }
-      }
-    }
 
     // frost speckles
-    ctx.globalAlpha = 0.10 + 0.28 * p;
-    ctx.fillStyle = 'rgba(255,255,255,.95)';
+    ctx.globalAlpha = 0.06 + 0.14 * p;
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
     for (let ty = startY; ty <= endY; ty++) {
       for (let tx = startX; tx <= endX; tx++) {
         const h = hash2(tx, ty);
@@ -4007,16 +4030,21 @@ function draw() {
 
     ctx.save();
 
-    // warm tint overlay
+    // cycle lava mood: A -> B -> C -> A (every ~7s)
+    const lavaIdx = Math.floor(((state.elapsed - state.lavaStartAt) / 7)) % 3;
+    const lavaTint = (lavaIdx === 0) ? '#ff5a2a' : (lavaIdx === 1 ? '#ff2f1e' : '#ff7a2a');
+    const vigEdge = (lavaIdx === 0) ? 'rgba(25,0,35,0.80)' : (lavaIdx === 1 ? 'rgba(20,0,20,0.90)' : 'rgba(28,0,18,0.85)');
+
+    // warm tint overlay (does not affect UI)
     ctx.globalAlpha = 0.10 + 0.42 * p;
-    ctx.fillStyle = '#ff5a2a';
+    ctx.fillStyle = lavaTint;
     ctx.fillRect(0, 0, view.w, view.h);
 
     // heavy vignette
     ctx.globalAlpha = 0.10 + 0.35 * p;
     const vg = ctx.createRadialGradient(view.w/2, view.h/2, 40, view.w/2, view.h/2, Math.max(view.w, view.h) * 0.8);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(25,0,35,0.80)');
+    vg.addColorStop(1, vigEdge);
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, view.w, view.h);
 
