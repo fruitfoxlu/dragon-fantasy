@@ -4010,37 +4010,38 @@ function draw() {
     }
   }
 
-  // Biome: snowland transition (starts at Lv15, fades in over ~80s)
-  // Make it VERY visible: stronger tint + snowy patches + drifting flakes.
+  // Biome: galaxy transition (replaces snowland; starts at Lv15, fades in over ~80s)
+  // Lightweight: dark gradient + sparse stars (screen-space).
   if (state.snowStartAt != null) {
     const p = clamp((state.elapsed - state.snowStartAt) / 80, 0, 1);
 
-    // Snow should NOT wash out everything.
-    // The floor is already swapped to snow tiles in tileKind(); here we only add subtle particles.
     ctx.save();
 
-    // frost speckles
-    ctx.globalAlpha = 0.06 + 0.14 * p;
-    ctx.fillStyle = 'rgba(255,255,255,.92)';
-    for (let ty = startY; ty <= endY; ty++) {
-      for (let tx = startX; tx <= endX; tx++) {
-        const h = hash2(tx, ty);
-        if ((h & 3) === 0) {
-          const sx = tx * tileSize - state.camera.x + ((h >>> 8) & 15);
-          const sy = ty * tileSize - state.camera.y + ((h >>> 12) & 15);
-          ctx.fillRect(sx, sy, 2, 2);
-        }
-      }
-    }
+    // darken the world (keep UI unaffected since UI draws later)
+    ctx.globalAlpha = 0.35 + 0.55 * p;
+    const bg = ctx.createLinearGradient(0, 0, 0, view.h);
+    bg.addColorStop(0, 'rgba(0,0,0,1)');
+    bg.addColorStop(1, 'rgba(6,10,22,1)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, view.w, view.h);
 
-    // drifting flakes (screen-space, subtle motion)
-    ctx.globalAlpha = 0.10 + 0.18 * p;
-    ctx.fillStyle = 'rgba(255,255,255,.90)';
-    const flN = Math.floor(80 * p);
-    for (let i = 0; i < flN; i++) {
-      const x = (i * 97 + Math.floor(state.elapsed * 22)) % (view.w + 60) - 30;
-      const y = (i * 53 + Math.floor(state.elapsed * 38)) % (view.h + 60) - 30;
-      ctx.fillRect(x, y, 2, 2);
+    // stars: stable positions, very slight drift
+    const driftX = Math.floor(state.elapsed * 4);
+    const driftY = Math.floor(state.elapsed * 2);
+    const n = Math.floor(140 * p);
+
+    for (let i = 0; i < n; i++) {
+      // deterministic pseudo-random distribution over screen
+      const x = (i * 197 + 23 + driftX) % (view.w + 40) - 20;
+      const y = (i * 131 + 71 + driftY) % (view.h + 40) - 20;
+      const tw = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(state.elapsed * (0.7 + (i % 7) * 0.11) + i));
+      const a = (0.20 + 0.55 * p) * tw;
+
+      ctx.globalAlpha = a;
+      ctx.fillStyle = (i % 11 === 0) ? 'rgba(180,210,255,1)' : 'rgba(255,255,255,1)';
+      // mostly 1px stars, occasional 2px
+      const r = (i % 17 === 0) ? 2 : 1;
+      ctx.fillRect(x, y, r, r);
     }
 
     ctx.restore();
