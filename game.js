@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v125';
+const BUILD = 'v126';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -965,11 +965,33 @@ function tintSprite(img, mul = [1, 1, 1], add = [0, 0, 0]) {
   return c;
 }
 
-// Snow floor tiles (keep outlines, but shift hues brighter/cooler)
-SPR.snowGrassA = tintSprite(SPR.grassA, [0.65, 0.85, 1.05], [70, 70, 70]);
-SPR.snowGrassB = tintSprite(SPR.grassB, [0.65, 0.85, 1.05], [70, 70, 70]);
-SPR.snowPathA  = tintSprite(SPR.pathA,  [0.75, 0.85, 1.00], [55, 55, 60]);
-SPR.snowPathB  = tintSprite(SPR.pathB,  [0.75, 0.85, 1.00], [55, 55, 60]);
+// Snow floor tiles (draw directly, so they render immediately)
+SPR.snowGrassA = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#eaf6ff');
+  px(g, 0, 0, 32, 1, 'rgba(0,0,0,.10)');
+  px(g, 0, 31, 32, 1, 'rgba(0,0,0,.10)');
+  // subtle icy texture
+  for (let i = 0; i < 18; i++) px(g, (i * 7) % 32, (i * 11) % 32, 2, 1, 'rgba(200,230,255,.45)');
+  for (let i = 0; i < 10; i++) px(g, (i * 13) % 32, (i * 5) % 32, 1, 1, 'rgba(255,255,255,.55)');
+});
+SPR.snowGrassB = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#deefff');
+  // slightly darker patches
+  px(g, 4, 6, 10, 6, 'rgba(190,220,245,.35)');
+  px(g, 18, 18, 10, 6, 'rgba(190,220,245,.35)');
+  for (let i = 0; i < 14; i++) px(g, (i * 9) % 32, (i * 13) % 32, 2, 1, 'rgba(210,235,255,.45)');
+});
+SPR.snowPathA = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#d7e9fb');
+  // packed snow bricks
+  for (let y = 2; y < 32; y += 6) px(g, 0, y, 32, 1, 'rgba(160,190,220,.35)');
+  for (let x = 3; x < 32; x += 10) px(g, x, 0, 1, 32, 'rgba(160,190,220,.25)');
+});
+SPR.snowPathB = makeSprite(32, 32, (g) => {
+  px(g, 0, 0, 32, 32, '#cfe4f9');
+  for (let y = 3; y < 32; y += 7) px(g, 0, y, 32, 1, 'rgba(150,180,210,.35)');
+  for (let x = 6; x < 32; x += 12) px(g, x, 0, 1, 32, 'rgba(150,180,210,.25)');
+});
 
 function tileKind(tx, ty) {
   // Two winding paths + occasional stone ruins patches.
