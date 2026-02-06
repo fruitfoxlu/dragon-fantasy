@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v123';
+const BUILD = 'v124';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -945,6 +945,7 @@ const SPR = {
 // --- biome tile variants (snow should affect FLOOR only)
 function tintSprite(img, mul = [1, 1, 1], add = [0, 0, 0]) {
   // Create a tinted copy of an existing sprite image.
+  // IMPORTANT: return a ready-to-draw canvas (not an <img>), so it renders immediately.
   const c = document.createElement('canvas');
   c.width = img.width;
   c.height = img.height;
@@ -961,9 +962,7 @@ function tintSprite(img, mul = [1, 1, 1], add = [0, 0, 0]) {
     d[i + 2] = clamp((d[i + 2] * mul[2] + add[2]), 0, 255);
   }
   g.putImageData(im, 0, 0);
-  const out = new Image();
-  out.src = c.toDataURL();
-  return out;
+  return c;
 }
 
 // Snow floor tiles (keep outlines, but shift hues brighter/cooler)
