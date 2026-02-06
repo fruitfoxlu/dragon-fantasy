@@ -4010,36 +4010,29 @@ function draw() {
     }
   }
 
-  // Biome: galaxy transition (replaces snowland; starts at Lv15, fades in over ~80s)
-  // Lightweight: dark gradient + sparse stars (screen-space).
+  // Biome: galaxy (replaces snowland; starts at Lv15)
+  // Requirements:
+  // 1) pure background
+  // 2) stars do not move
+  // 3) instant switch (no fade-in)
   if (state.snowStartAt != null) {
-    const p = clamp((state.elapsed - state.snowStartAt) / 80, 0, 1);
-
     ctx.save();
 
-    // darken the world (keep UI unaffected since UI draws later)
-    ctx.globalAlpha = 0.35 + 0.55 * p;
+    // instant dark background
+    ctx.globalAlpha = 1;
     const bg = ctx.createLinearGradient(0, 0, 0, view.h);
     bg.addColorStop(0, 'rgba(0,0,0,1)');
     bg.addColorStop(1, 'rgba(6,10,22,1)');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, view.w, view.h);
 
-    // stars: stable positions, very slight drift
-    const driftX = Math.floor(state.elapsed * 4);
-    const driftY = Math.floor(state.elapsed * 2);
-    const n = Math.floor(140 * p);
-
+    // stars: fixed screen-space pattern (no drift, no twinkle)
+    const n = 140;
     for (let i = 0; i < n; i++) {
-      // deterministic pseudo-random distribution over screen
-      const x = (i * 197 + 23 + driftX) % (view.w + 40) - 20;
-      const y = (i * 131 + 71 + driftY) % (view.h + 40) - 20;
-      const tw = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(state.elapsed * (0.7 + (i % 7) * 0.11) + i));
-      const a = (0.20 + 0.55 * p) * tw;
-
-      ctx.globalAlpha = a;
+      const x = (i * 197 + 23) % view.w;
+      const y = (i * 131 + 71) % view.h;
+      ctx.globalAlpha = (i % 13 === 0) ? 0.75 : 0.45;
       ctx.fillStyle = (i % 11 === 0) ? 'rgba(180,210,255,1)' : 'rgba(255,255,255,1)';
-      // mostly 1px stars, occasional 2px
       const r = (i % 17 === 0) ? 2 : 1;
       ctx.fillRect(x, y, r, r);
     }
