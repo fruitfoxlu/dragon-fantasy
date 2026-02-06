@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v128';
+const BUILD = 'v129';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1345,6 +1345,9 @@ const state = {
   finalBossDefeated: false,
   finalBossStartAt: null,
   runEndedAt: null,
+
+  // cap total treasure chests in a run
+  chestsSpawned: 0,
 };
 
 const player = {
@@ -1448,8 +1451,8 @@ const weapons = {
     name: 'Meteor',
     lvl: 0,
     kind: 'meteor',
-    followTrail: false,
-    trailDelay: 1.0,
+    followTrail: true,
+    trailDelay: 1.1,
     enabled: false,
     cd: 0,
     baseCooldown: 2.4,
@@ -1506,9 +1509,14 @@ const gems = [];          // {x,y,r, xp}
 const chests = [];        // {x,y,r}
 
 function pushChest(x, y, r=12) {
-  // hard cap: max 6 treasure gems on the map; overflow becomes heal drop
+  // hard cap: max 6 treasure chests on the map; overflow becomes heal drop
   if (chests.length >= 6) return false;
+
+  // hard cap: total 35 chests per run
+  if ((state.chestsSpawned || 0) >= 35) return false;
+
   chests.push({ x, y, r });
+  state.chestsSpawned = (state.chestsSpawned || 0) + 1;
   return true;
 }
 const vacuumGems = [];    // {x,y,r}
@@ -3288,6 +3296,11 @@ function applyLevelStep() {
   } else {
     player.xpNeed = Math.floor(((10 + player.level * 7 + Math.pow(player.level, 1.25)) * 1.25) * 3);
   }
+
+  // Lv20+: require 2x XP to level up
+  if (player.level >= 20) {
+    player.xpNeed = Math.floor(player.xpNeed * 2);
+  }
   // biome: start snow transition at Lv15
   if (player.level === 15 && state.snowStartAt == null) {
     state.snowStartAt = state.elapsed;
@@ -3622,12 +3635,13 @@ const UPGRADE_POOL = [
   },
 
   // Blades upgrades
-  {
-    id: 'blades_more',
-    title: '迴旋斬：刀刃 +1',
-    desc: '多一把刀，覆蓋更廣。',
-    apply() { weapons.blades.blades += 1; weapons.blades.lvl += 1; }
-  },
+  // Removed +1 blades option; blades upgrades should add +2.
+  // {
+  //   id: 'blades_more',
+  //   title: '迴旋斬：刀刃 +1',
+  //   desc: '多一把刀，覆蓋更廣。',
+  //   apply() { weapons.blades.blades += 1; weapons.blades.lvl += 1; }
+  // },
   {
     id: 'blades_dmg',
     title: '迴旋斬：傷害 +25%',
@@ -3692,12 +3706,13 @@ const UPGRADE_POOL = [
     desc: '地面灼燒更致命。',
     apply() { weapons.meteor.burnDps = Math.round(weapons.meteor.burnDps * 1.25); weapons.meteor.lvl += 1; }
   },
-  {
-    id: 'meteor_trail',
-    title: '隕石術：追蹤腳步（延遲）',
-    desc: '隕石會落在你「之前走過的腳步」上。',
-    apply() { weapons.meteor.followTrail = true; weapons.meteor.trailDelay = 1.1; weapons.meteor.lvl += 1; }
-  },
+  // Meteor trail upgrade removed: Meteor follows footsteps by default now.
+  // {
+  //   id: 'meteor_trail',
+  //   title: '隕石術：追蹤腳步（延遲）',
+  //   desc: '隕石會落在你「之前走過的腳步」上。',
+  //   apply() { weapons.meteor.followTrail = true; weapons.meteor.trailDelay = 1.1; weapons.meteor.lvl += 1; }
+  // },
 
   // Frost upgrades
   {
@@ -5058,6 +5073,7 @@ function resetRun() {
   state.elapsed = 0;
   state.kills = 0;
   state.nextBossAt = 360;
+  state.chestsSpawned = 0;
   state.awardQueue = [];
   state.awardedLevels = {};
   state.currentAwardLevel = null;
