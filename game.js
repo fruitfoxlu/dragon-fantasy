@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v121';
+const BUILD = 'v122';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1047,6 +1047,9 @@ window.addEventListener('keydown', (e) => {
     // Spawn final boss duel (debug)
     if (e.code === 'KeyB') {
       e.preventDefault();
+      // Debug spawn: make sure we don't instantly die.
+      player.hp = Math.max(player.hpMax, player.hp);
+      player.invuln = 1.2;
       state.finalBossPending = true;
       state.finalBossStarted = false;
       startFinalBossDuel();
@@ -1767,6 +1770,11 @@ function startFinalBossDuel() {
   state.finalBossStarted = true;
   state.phase = 'final';
   state.finalBossStartAt = state.elapsed;
+
+  // Ensure we are in a playable state when the duel starts.
+  state.mode = 'play';
+  player.hp = Math.max(1, Math.min(player.hpMax, player.hp));
+  player.invuln = Math.max(player.invuln || 0, 1.0);
 
   // Clear the arena: no minions, no loot distractions.
   enemies.length = 0;
