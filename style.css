@@ -65,7 +65,8 @@ body{
 }
 
 #start,
-#levelup{
+#levelup,
+#summary{
   position:fixed;
   inset:0;
   display:flex;
