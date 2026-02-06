@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v124';
+const BUILD = 'v125';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -3960,7 +3960,9 @@ function draw() {
   state.camera.y = player.y - centerY;
 
   // ---- pixel tile background (32x32)
-  ctx.clearRect(0, 0, view.w, view.h);
+  // Use an explicit solid fill first (avoid rare transparent/black glitches on some browsers/GPU paths).
+  ctx.fillStyle = '#0b0f16';
+  ctx.fillRect(0, 0, view.w, view.h);
   const tileSize = 32;
   const startX = Math.floor(state.camera.x / tileSize) - 1;
   const startY = Math.floor(state.camera.y / tileSize) - 1;
