@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v132';
+const BUILD = 'v133';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -312,6 +312,11 @@ function setLang(next) {
     if (state.mode === 'levelup') ui.modalTitle.textContent = t('levelUpTitle');
     if (state.mode === 'chest') ui.modalTitle.textContent = t('chestTitle');
     if (state.mode === 'replace') ui.modalTitle.textContent = t('replaceTitle');
+  }
+
+  // If the upgrade/chest modal is currently open, re-render choices immediately.
+  if ((state.mode === 'levelup' || state.mode === 'chest' || state.mode === 'replace') && !ui.levelup?.classList.contains('hidden')) {
+    renderChoiceUI();
   }
 
   applyStaticI18n();
@@ -3836,6 +3841,31 @@ function openLevelUp() {
   openChoiceModal('levelup', t('levelUpTitle') + rangeTxt + extra, UPGRADE_POOL);
 }
 
+function renderChoiceUI() {
+  if (!ui.choices) return;
+
+  ui.choices.innerHTML = '';
+  currentChoices.forEach((u, idx) => {
+    const div = document.createElement('div');
+    div.className = 'choice';
+    const title = (typeof u.title === 'function')
+      ? u.title()
+      : ((typeof u.title === 'object')
+        ? ((typeof u.title[lang] === 'function') ? u.title[lang]() : (u.title[lang] || u.title.en || u.title.zh))
+        : u.title);
+    const desc = (typeof u.desc === 'function')
+      ? u.desc()
+      : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
+
+    const title2 = (lang === 'en') ? autoEnUpgradeText(title) : title;
+    const desc2  = (lang === 'en') ? autoEnUpgradeText(desc)  : desc;
+
+    div.innerHTML = `<div class="t">${idx + 1}. ${title2}</div><div class="d">${desc2}</div>`;
+    div.addEventListener('click', () => chooseUpgrade(idx));
+    ui.choices.appendChild(div);
+  });
+}
+
 function openChest() {
   // Chest: spells only (magic), 3-choice; if all magic maxed, offer XP instead.
   state.mode = 'chest';
@@ -3952,28 +3982,7 @@ function openChest() {
     }
   }
 
-  // render
-  ui.choices.innerHTML = '';
-  currentChoices.forEach((u, idx) => {
-    const div = document.createElement('div');
-    div.className = 'choice';
-    const title = (typeof u.title === 'function')
-      ? u.title()
-      : ((typeof u.title === 'object')
-        ? ((typeof u.title[lang] === 'function') ? u.title[lang]() : (u.title[lang] || u.title.en || u.title.zh))
-        : u.title);
-    const desc = (typeof u.desc === 'function')
-      ? u.desc()
-      : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
-
-    const title2 = (lang === 'en') ? autoEnUpgradeText(title) : title;
-    const desc2  = (lang === 'en') ? autoEnUpgradeText(desc)  : desc;
-
-    div.innerHTML = `<div class="t">${idx + 1}. ${title2}</div><div class="d">${desc2}</div>`;
-    div.addEventListener('click', () => chooseUpgrade(idx));
-    ui.choices.appendChild(div);
-  });
-
+  renderChoiceUI();
   ui.levelup.classList.remove('hidden');
 }
 
@@ -4001,26 +4010,7 @@ function openReplaceWeaponModal(newWeaponKey) {
     apply() { pendingWeaponUnlock = null; }
   });
 
-  ui.choices.innerHTML = '';
-  currentChoices.forEach((u, idx) => {
-    const div = document.createElement('div');
-    div.className = 'choice';
-    const title = (typeof u.title === 'function')
-      ? u.title()
-      : ((typeof u.title === 'object')
-        ? ((typeof u.title[lang] === 'function') ? u.title[lang]() : (u.title[lang] || u.title.en || u.title.zh))
-        : u.title);
-    const desc = (typeof u.desc === 'function')
-      ? u.desc()
-      : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
-
-    const title2 = (lang === 'en') ? autoEnUpgradeText(title) : title;
-    const desc2  = (lang === 'en') ? autoEnUpgradeText(desc)  : desc;
-
-    div.innerHTML = `<div class="t">${idx + 1}. ${title2}</div><div class="d">${desc2}</div>`;
-    div.addEventListener('click', () => chooseUpgrade(idx));
-    ui.choices.appendChild(div);
-  });
+  renderChoiceUI();
 
   ui.levelup.classList.remove('hidden');
 }
@@ -4130,26 +4120,7 @@ function openChoiceModal(mode, title, poolBase) {
     currentChoices.push(u);
   }
 
-  ui.choices.innerHTML = '';
-  currentChoices.forEach((u, idx) => {
-    const div = document.createElement('div');
-    div.className = 'choice';
-    const title = (typeof u.title === 'function')
-      ? u.title()
-      : ((typeof u.title === 'object')
-        ? ((typeof u.title[lang] === 'function') ? u.title[lang]() : (u.title[lang] || u.title.en || u.title.zh))
-        : u.title);
-    const desc = (typeof u.desc === 'function')
-      ? u.desc()
-      : ((typeof u.desc === 'object') ? (u.desc[lang] || u.desc.en || u.desc.zh) : u.desc);
-
-    const title2 = (lang === 'en') ? autoEnUpgradeText(title) : title;
-    const desc2  = (lang === 'en') ? autoEnUpgradeText(desc)  : desc;
-
-    div.innerHTML = `<div class="t">${idx + 1}. ${title2}</div><div class="d">${desc2}</div>`;
-    div.addEventListener('click', () => chooseUpgrade(idx));
-    ui.choices.appendChild(div);
-  });
+  renderChoiceUI();
 
   ui.levelup.classList.remove('hidden');
 }
