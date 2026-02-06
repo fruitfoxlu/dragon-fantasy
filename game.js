@@ -1001,10 +1001,9 @@ function tileKind(tx, ty) {
   const y2 = Math.floor(ty * 0.45 + Math.sin(tx * 0.22 + 2.2) * 4);
   const onPath = (Math.abs(ty - y1) <= 1) || (Math.abs(ty - y2) <= 1);
 
-  // Snow: only change the FLOOR tiles (do NOT wash out units/UI)
-  const snowP = (state.snowStartAt != null) ? clamp((state.elapsed - state.snowStartAt) / 35, 0, 1) : 0;
-  const snowRoll = ((h >>> 8) & 255) / 255;
-  const useSnow = snowP > 0 && snowRoll < (0.92 * snowP);
+  // NOTE: Lv15 biome trigger now means "galaxy".
+  // We keep snowStartAt as the trigger flag, but DO NOT swap floor tiles to snow.
+  const useSnow = false;
 
   if (onPath) {
     const k = (h & 1) ? 'pathA' : 'pathB';
