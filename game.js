@@ -195,10 +195,13 @@ function weaponLabel(key) {
 }
 
 function nextDragonUpgradeId() {
+  // TEMP: Dragon Soul disabled (was causing freezes/no response).
+  return null;
+
   // Dragon Soul upgrades are a strict sequence, up to MAGIC_CAP.
-  if (!weapons.dragon.enabled) return 'unlock_dragon';
-  const w = weapons.dragon;
-  const stage = w.stage || 0;
+  // if (!weapons.dragon.enabled) return 'unlock_dragon';
+  // const w = weapons.dragon;
+  // const stage = w.stage || 0;
 
   const seq = [
     'dragon_speed_1','dragon_more_1',
@@ -2410,10 +2413,25 @@ function updateMeteor(dt) {
   const per = (w.countPerLvl ?? 2);
   const count = Math.max(1, base + (lvl - 1) * per);
 
+  // If followTrail, target a previous footstep (like original), then add small offsets per meteor
+  // so multi-cast doesn't fully stack.
+  let baseX = null, baseY = null;
+  if (w.followTrail && playerTrail.length) {
+    const targetT = state.elapsed - (w.trailDelay || 1.0);
+    let best = playerTrail[0];
+    for (let i = 0; i < playerTrail.length; i++) {
+      const p = playerTrail[i];
+      if (p.t <= targetT) best = p; else break;
+    }
+    baseX = best.x;
+    baseY = best.y;
+  }
+
+  const spread = w.followTrail ? Math.min(90, Math.max(22, w.scatter * 0.25)) : w.scatter;
+
   for (let i = 0; i < count; i++) {
-    // scatter each meteor a bit so they don't all stack on the same point
-    const tx = player.x + rand(-w.scatter, w.scatter);
-    const ty = player.y + rand(-w.scatter, w.scatter);
+    const tx = (baseX == null) ? (player.x + rand(-w.scatter, w.scatter)) : (baseX + rand(-spread, spread));
+    const ty = (baseY == null) ? (player.y + rand(-w.scatter, w.scatter)) : (baseY + rand(-spread, spread));
     spawnMeteor(tx, ty);
   }
 
@@ -3316,14 +3334,8 @@ function autoPickUpgrade() {
     if (u.id.startsWith('frost_') && !weapons.frost.enabled) return false;
     if (u.id === 'unlock_frost' && weapons.frost.enabled) return false;
 
-    // dragon sequence gate
-    if (u.id.startsWith('dragon_') && !weapons.dragon.enabled) return false;
-    if (u.id === 'unlock_dragon' && weapons.dragon.enabled) return false;
-    const nextD = nextDragonUpgradeId();
-    if (u.id.startsWith('dragon_')) {
-      if (!nextD) return false;
-      if (u.id !== nextD) return false;
-    }
+    // Dragon Soul TEMP DISABLED
+    if (u.id === 'unlock_dragon' || u.id.startsWith('dragon_')) return false;
 
     // hide frost cone-only? none
     return true;
@@ -3332,8 +3344,7 @@ function autoPickUpgrade() {
   const magicPool = pool.filter(u => (
     u.id === 'unlock_meteor' || u.id.startsWith('meteor_') ||
     u.id === 'unlock_frost' || u.id.startsWith('frost_') ||
-    u.id === 'unlock_lightning' || u.id.startsWith('lightning_') ||
-    u.id === 'unlock_dragon' || u.id.startsWith('dragon_')
+    u.id === 'unlock_lightning' || u.id.startsWith('lightning_')
   ));
 
   const pickFrom = magicPool.length ? magicPool : pool;
@@ -3391,22 +3402,24 @@ const UPGRADE_POOL = [
   },
 
   // Dragon Soul (sequence upgrades)
-  {
-    id: 'unlock_dragon',
-    title: '解鎖 龍魂（Dragon Soul）',
-    desc: '低傷高覆蓋：4 個十字貼身慢轉，升級交替提升轉速/數量。',
-    apply() {
-      const w = weapons.dragon;
-      w.enabled = true;
-      w.lvl = Math.max(1, w.lvl);
-      w.stage = 0;
-      w.crosses = 4;
-      w.damage = 60;
-      w.radius = 120;
-      w.angSpeed = 1.1;
-      w.jitter = 0.45;
-    }
-  },
+  // TEMP DISABLED: caused freezes/no response; re-enable after root cause found.
+  // {
+  //   id: 'unlock_dragon',
+  //   title: '解鎖 龍魂（Dragon Soul）',
+  //   desc: '低傷高覆蓋：4 個十字貼身慢轉，升級交替提升轉速/數量。',
+  //   apply() {
+  //     const w = weapons.dragon;
+  //     w.enabled = true;
+  //     w.lvl = Math.max(1, w.lvl);
+  //     w.stage = 0;
+  //     w.crosses = 4;
+  //     w.damage = 60;
+  //     w.radius = 120;
+  //     w.angSpeed = 1.1;
+  //     w.jitter = 0.45;
+  //   }
+  // },
+
   {
     id: 'dragon_speed_1',
     title: '龍魂：轉速提升（慢→中）',
@@ -3775,20 +3788,21 @@ function openChest() {
     const isMagic = (
       id === 'unlock_meteor' || id.startsWith('meteor_') ||
       id === 'unlock_frost' || id.startsWith('frost_') ||
-      id === 'unlock_lightning' || id.startsWith('lightning_') ||
-      id === 'unlock_dragon' || id.startsWith('dragon_')
+      id === 'unlock_lightning' || id.startsWith('lightning_')
     );
     if (!isMagic) return false;
 
     // gate surprises
     if ((id === 'unlock_lightning' || id.startsWith('lightning_')) && player.level < 15) return false;
-    if ((id === 'unlock_dragon' || id.startsWith('dragon_')) && player.level < 15) return false;
+    // Dragon Soul TEMP DISABLED
+    if (id === 'unlock_dragon' || id.startsWith('dragon_')) return false;
 
     // unlock only if not enabled
     if (id === 'unlock_meteor') return !weapons.meteor.enabled;
     if (id === 'unlock_frost') return !weapons.frost.enabled;
     if (id === 'unlock_lightning') return !weapons.lightning.enabled;
-    if (id === 'unlock_dragon') return !weapons.dragon.enabled;
+    // Dragon Soul TEMP DISABLED
+    if (id === 'unlock_dragon') return false;
 
     // upgrades only if enabled and not capped
     if (id.startsWith('meteor_')) return weapons.meteor.enabled && magicLvl('meteor') < MAGIC_CAP;
@@ -3825,7 +3839,7 @@ function openChest() {
   // XP (Soul Surge) should NOT appear early.
   // Rule: only allow XP options when you have at least TWO spells at cap,
   // and the chest cannot produce 3 spell options.
-  const cappedCount = ['meteor','frost','lightning','dragon'].reduce((a,k)=>a+(magicCapped(k)?1:0),0);
+  const cappedCount = ['meteor','frost','lightning'].reduce((a,k)=>a+(magicCapped(k)?1:0),0);
   const xpAllowed = (cappedCount >= 2);
 
   currentChoices = [];
@@ -3939,7 +3953,8 @@ function enabledWeaponKeys() {
 }
 
 function enabledMagicKeys() {
-  return ['lightning', 'frost', 'meteor', 'dragon'].filter(k => weapons[k].enabled);
+  // Dragon Soul TEMP DISABLED
+  return ['lightning', 'frost', 'meteor'].filter(k => weapons[k].enabled);
 }
 
 function weaponEnabledCount() {
@@ -3995,7 +4010,8 @@ function openChoiceModal(mode, title, poolBase) {
     if ((u.id === 'unlock_meteor' || u.id.startsWith('meteor_')) && player.level < 5) return false;
     if ((u.id === 'unlock_frost' || u.id.startsWith('frost_')) && player.level < 10) return false;
     if ((u.id === 'unlock_lightning' || u.id.startsWith('lightning_')) && player.level < 15) return false;
-    if ((u.id === 'unlock_dragon' || u.id.startsWith('dragon_')) && player.level < 20) return false;
+    // Dragon Soul TEMP DISABLED
+    if (u.id === 'unlock_dragon' || u.id.startsWith('dragon_')) return false;
 
     // gate meteor upgrades
     if (u.id.startsWith('meteor_') && !weapons.meteor.enabled) return false;
@@ -4005,15 +4021,8 @@ function openChoiceModal(mode, title, poolBase) {
     if (u.id.startsWith('frost_') && !weapons.frost.enabled) return false;
     if (u.id === 'unlock_frost' && weapons.frost.enabled) return false;
 
-    // gate dragon soul upgrades (force an ordered sequence)
-    if (u.id.startsWith('dragon_') && !weapons.dragon.enabled) return false;
-    if (u.id === 'unlock_dragon' && weapons.dragon.enabled) return false;
-
-    const nextD = nextDragonUpgradeId();
-    if (u.id.startsWith('dragon_')) {
-      if (!nextD) return false;
-      if (u.id !== nextD) return false;
-    }
+    // Dragon Soul TEMP DISABLED
+    if (u.id === 'unlock_dragon' || u.id.startsWith('dragon_')) return false;
 
     return true;
   });
