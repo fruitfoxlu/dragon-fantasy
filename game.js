@@ -2449,7 +2449,24 @@ function updateDragonSoul(dt) {
     e.dragonHitCd = Math.max(0, (e.dragonHitCd || 0) - dt);
   }
 
+  // PERF: when there are tons of enemies on screen, checking every enemy for every cross can freeze.
+  // Limit collision checks to a capped set of nearby enemies.
   const reach = ((w.crossSize || 42) * 0.9);
+  const maxDist = (w.radius || 120) + reach + 140; // generous bound around the player
+  const maxD2 = maxDist * maxDist;
+  const MAX_CAND = 240;
+  const cand = [];
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if ((e.dragonHitCd || 0) > 0) continue;
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    if (dx * dx + dy * dy > maxD2) continue;
+    cand.push(e);
+    if (cand.length >= MAX_CAND) break;
+  }
+
+  if (!cand.length) return;
 
   for (let i = 0; i < n; i++) {
     const u = w.ang + i * (Math.PI * 2 / n);
@@ -2458,10 +2475,9 @@ function updateDragonSoul(dt) {
     const cx = player.x + Math.sin(u) * rad;
     const cy = player.y + Math.sin(2 * u) * rad * 0.55;
 
-    // damage enemies in a small AoE around cross (use squared distance; avoid sqrt)
-    for (let ei = enemies.length - 1; ei >= 0; ei--) {
-      const e = enemies[ei];
-      if ((e.dragonHitCd || 0) > 0) continue;
+    // damage nearby candidates (use squared distance; avoid sqrt)
+    for (let j = 0; j < cand.length; j++) {
+      const e = cand[j];
       const rr = reach + e.r;
       const dx = cx - e.x;
       const dy = cy - e.y;
@@ -2472,11 +2488,19 @@ function updateDragonSoul(dt) {
         const [nx, ny] = norm(e.x - player.x, e.y - player.y);
         e.vx += nx * 180;
         e.vy += ny * 180;
-        if (e.hp <= 0) killEnemyAt(ei);
       }
     }
   }
 }
+
+// cleanup kills after dragon tick (separate pass so indices are safe)
+// (kept cheap by scanning once)
+function cleanupDeadEnemies() {
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    if (enemies[i].hp <= 0) killEnemyAt(i);
+  }
+}
+
 
 function updateWeapons(dt) {
   updateProjectileWeapons(dt);
@@ -2485,6 +2509,8 @@ function updateWeapons(dt) {
   updateMeteor(dt);
   updateFrostShockwave(dt);
   updateDragonSoul(dt);
+  // Ensure any dragon-killed enemies are removed (drop loot, etc.) without index hazards.
+  cleanupDeadEnemies();
 }
 
 function updateBullets(dt) {
