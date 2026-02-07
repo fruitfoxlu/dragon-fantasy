@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v134';
+const BUILD = 'v135';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1645,8 +1645,8 @@ function pushChest(x, y, r=12) {
   // hard cap: max 6 treasure chests on the map; overflow becomes heal drop
   if (chests.length >= 6) return false;
 
-  // hard cap: total 35 chests per run
-  if ((state.chestsSpawned || 0) >= 35) return false;
+  // hard cap: total 30 chests per run
+  if ((state.chestsSpawned || 0) >= 30) return false;
 
   chests.push({ x, y, r });
   state.chestsSpawned = (state.chestsSpawned || 0) + 1;
