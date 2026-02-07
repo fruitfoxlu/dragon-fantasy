@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v138';
+const BUILD = 'v139';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1329,6 +1329,15 @@ window.addEventListener('keydown', (e) => {
       e.preventDefault();
       applyPlayerDamage(20, player.x - 10, player.y - 10, 0);
       dbg('damage 20 (debug)');
+      return;
+    }
+
+    // Regen passive quick test (debug)
+    if (e.code === 'KeyR') {
+      e.preventDefault();
+      player.passives.regen = Math.min(5, (player.passives.regen || 0) + 1);
+      player.hp = Math.min(player.hp, player.hpMax * 0.50);
+      dbg('regen Lv' + player.passives.regen);
       return;
     }
   }
