@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v133';
+const BUILD = 'v134';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -148,6 +148,7 @@ const I18N = {
     w_meteor: 'Meteor',
     w_frost: 'Frost Shockwave',
     w_dragon: 'Dragon Soul',
+    w_aegis: 'Aegis',
   },
   zh: {
     sfx: (on) => `音效：${on ? '開' : '關'}`, 
@@ -181,6 +182,7 @@ const I18N = {
     w_meteor: '隕石術',
     w_frost: '冰凍衝擊波',
     w_dragon: '龍魂',
+    w_aegis: '護盾護符',
   },
 };
 
@@ -274,6 +276,18 @@ function autoEnUpgradeText(s) {
   // remove leftover CJK punctuation/spaces a bit
   out = out.replace(/\s+/g, ' ').trim();
   return out;
+}
+
+function nextAegisUpgradeId() {
+  const w = weapons.aegis;
+  if (!w?.enabled) return 'unlock_aegis';
+  const lvl = w.lvl || 0;
+  if (lvl <= 0) return 'unlock_aegis';
+  if (lvl === 1) return 'aegis_recharge_1';
+  if (lvl === 2) return 'aegis_recharge_2';
+  if (lvl === 3) return 'aegis_recharge_3';
+  if (lvl === 4) return 'aegis_pulse';
+  return null;
 }
 
 function applyStaticI18n() {
@@ -1263,6 +1277,50 @@ window.addEventListener('keydown', (e) => {
       dbg('clear enemies');
       return;
     }
+
+    // Grant/upgrade Aegis quickly (debug)
+    if (e.code === 'KeyG') {
+      e.preventDefault();
+      if (!weapons.aegis.enabled) {
+        // simulate unlock
+        const w = weapons.aegis;
+        w.enabled = true;
+        w.lvl = 1;
+        w.maxCharges = 3;
+        w.charges = 3;
+        w.rechargeSec = 10;
+        w.rechargeT = 0;
+        w.pulseEnabled = false;
+        w.pulseT = 0;
+      } else {
+        // step upgrades
+        if (weapons.aegis.lvl === 1) weapons.aegis.rechargeSec = 8;
+        else if (weapons.aegis.lvl === 2) weapons.aegis.rechargeSec = 6.5;
+        else if (weapons.aegis.lvl === 3) weapons.aegis.rechargeSec = 5;
+        else if (weapons.aegis.lvl === 4) weapons.aegis.pulseEnabled = true;
+        weapons.aegis.lvl += 1;
+      }
+      dbg('aegis debug -> Lv' + weapons.aegis.lvl + ' charges ' + weapons.aegis.charges);
+      return;
+    }
+
+    // Force a pulse now (debug)
+    if (e.code === 'KeyH') {
+      e.preventDefault();
+      weapons.aegis.enabled = true;
+      weapons.aegis.pulseEnabled = true;
+      castAegisPulse();
+      dbg('aegis pulse (debug)');
+      return;
+    }
+
+    // Take damage now (debug)
+    if (e.code === 'KeyJ') {
+      e.preventDefault();
+      applyPlayerDamage(20, player.x - 10, player.y - 10, 0);
+      dbg('damage 20 (debug)');
+      return;
+    }
   }
   if (state.mode === 'start') {
     if (e.code === 'Enter' || e.code === 'Space') startGame();
@@ -1433,8 +1491,8 @@ const player = {
 // weapon model:
 // - projectile types: kind auto|forward uses bullets
 // - special types implement their own firing in updateWeapons
-const WEAPON_KEYS = ['wand','bow','holy','blades'];
-const MAGIC_KEYS = ['lightning','frost','meteor','dragon'];
+const WEAPON_KEYS = ['wand','bow','holy','blades','aegis'];
+const MAGIC_KEYS = ['lightning','frost','meteor','dragon']; // dragon currently disabled
 
 const weapons = {
   wand: {
@@ -1555,6 +1613,21 @@ const weapons = {
     ang: 0,
     angSpeed: 1.1,
     jitter: 0.45,
+  },
+
+  aegis: {
+    name: 'Aegis',
+    kind: 'aegis',
+    enabled: false,
+    lvl: 0,
+    maxCharges: 3,
+    charges: 0,
+    rechargeSec: 10,
+    rechargeT: 0,
+    pulseEnabled: false,
+    pulseCd: 5.0,
+    pulseT: 0,
+    pulseRadius: 320,
   },
 };
 
@@ -2167,6 +2240,108 @@ function killEnemyAt(index) {
   enemies.splice(index, 1);
 }
 
+function updateAegis(dt) {
+  const w = weapons.aegis;
+  if (!w || !w.enabled) return;
+
+  // recharge per missing charge
+  if (w.charges < w.maxCharges) {
+    w.rechargeT += dt;
+    if (w.rechargeT >= w.rechargeSec) {
+      w.rechargeT = 0;
+      w.charges += 1;
+      dbg('aegis+1 -> ' + w.charges + '/' + w.maxCharges);
+    }
+  } else {
+    w.rechargeT = 0;
+  }
+
+  // pulse
+  if (w.pulseEnabled) {
+    w.pulseT += dt;
+    if (w.pulseT >= w.pulseCd) {
+      w.pulseT = 0;
+      castAegisPulse();
+    }
+  }
+}
+
+function castAegisPulse() {
+  const w = weapons.aegis;
+  if (!w?.enabled || !w.pulseEnabled) return;
+
+  // High damage pulse, scaling a bit with player level.
+  const rad = w.pulseRadius || 320;
+  const rad2 = rad * rad;
+  const dmg = Math.round(260 + player.level * 14);
+
+  let hit = 0;
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    if (dx * dx + dy * dy > rad2) continue;
+
+    damageEnemy(e, dmg, player.x, player.y);
+    // mild knockback
+    const [nx, ny] = norm(e.x - player.x, e.y - player.y);
+    e.vx += nx * 220;
+    e.vy += ny * 220;
+    hit++;
+
+    if (e.hp <= 0) killEnemyAt(i);
+  }
+
+  // visual ring
+  effects.push({ type: 'wave', x: player.x, y: player.y, t: 0, ttl: 0.20, r0: 20, r1: rad, ang: Math.PI * 2, fx: 0, fy: 1 });
+  dbg('aegisPulse hit=' + hit + ' dmg=' + dmg);
+}
+
+function tryBlockWithAegis() {
+  const w = weapons.aegis;
+  if (!w?.enabled) return false;
+  if (w.charges <= 0) return false;
+
+  w.charges -= 1;
+  // short invuln so multi-hit frames don't eat multiple charges instantly
+  player.invuln = Math.max(player.invuln || 0, 0.22);
+
+  // start recharge timer if we're now missing a charge
+  if (w.charges < w.maxCharges) {
+    // keep current recharge progress if already charging
+    w.rechargeT = Math.max(0, w.rechargeT || 0);
+  }
+
+  dbg('aegisBlock -> ' + w.charges + '/' + w.maxCharges);
+  return true;
+}
+
+function applyPlayerDamage(amount, srcx=null, srcy=null, knock=0) {
+  if (amount <= 0) return false;
+  if (player.invuln > 0) return false;
+
+  // Aegis blocks one hit
+  if (tryBlockWithAegis()) {
+    // optional knockback even when blocked (small)
+    if (knock && srcx != null && srcy != null) {
+      const [nx, ny] = norm(player.x - srcx, player.y - srcy);
+      player.x += nx * (knock * 0.5);
+      player.y += ny * (knock * 0.5);
+    }
+    sfxPickup('reward');
+    return true;
+  }
+
+  player.hp -= amount;
+  sfxHit();
+  if (knock && srcx != null && srcy != null) {
+    const [nx, ny] = norm(player.x - srcx, player.y - srcy);
+    player.x += nx * knock;
+    player.y += ny * knock;
+  }
+  return true;
+}
+
 function damageEnemy(e, amount, srcx=null, srcy=null) {
   let dmg = amount;
   if (e.type === 'shield' && srcx != null && srcy != null) {
@@ -2231,6 +2406,8 @@ function updatePlayer(dt) {
   player.y = clamp(player.y, -WBOUND, WBOUND);
 
   player.invuln = Math.max(0, player.invuln - dt);
+
+  updateAegis(dt);
 }
 
 function forwardVec(dir) {
@@ -2650,12 +2827,8 @@ function updateBullets(dt) {
       const d = dist(b.x, b.y, player.x, player.y);
       if (d < (b.r || 6) + player.r) {
         if (player.invuln <= 0) {
-          player.hp -= (b.dmg || 18);
-          sfxHit();
+          applyPlayerDamage((b.dmg || 18), b.x, b.y, 18);
           player.invuln = 0.55;
-          const [nx, ny] = norm(player.x - b.x, player.y - b.y);
-          player.x += nx * 18;
-          player.y += ny * 18;
         }
         enemyBullets.splice(i, 1);
         continue;
@@ -3092,12 +3265,8 @@ function updateEnemies(dt) {
     const d2 = dist(e.x, e.y, player.x, player.y);
     if (d2 < e.r + player.r) {
       if (player.invuln <= 0) {
-        player.hp -= e.touchDmg;
-        sfxHit();
+        applyPlayerDamage(e.touchDmg, e.x, e.y, (e.type === 'boss' ? 26 : 14));
         player.invuln = (e.type === 'boss') ? 0.70 : 0.55;
-        const [nx, ny] = norm(player.x - e.x, player.y - e.y);
-        player.x += nx * (e.type === 'boss' ? 26 : 14);
-        player.y += ny * (e.type === 'boss' ? 26 : 14);
       }
     }
 
@@ -3114,12 +3283,8 @@ function updateEnemies(dt) {
           const dd = dist(bx, by, player.x, player.y);
           if (dd < br + player.r) {
             if (player.invuln <= 0) {
-              player.hp -= 22;
-              sfxHit();
+              applyPlayerDamage(22, bx, by, 24);
               player.invuln = 0.45;
-              const [nx, ny] = norm(player.x - bx, player.y - by);
-              player.x += nx * 24;
-              player.y += ny * 24;
             }
             e.bladeDmgCd = 0.20;
             break;
@@ -3325,12 +3490,8 @@ function updateEffects(dt) {
       if (fx.t < 0.08) {
         const d = dist(fx.x, fx.y, player.x, player.y);
         if (d <= fx.radius + player.r && player.invuln <= 0) {
-          player.hp -= 34;
-          sfxHit();
+          applyPlayerDamage(34, fx.x, fx.y, 34);
           player.invuln = 0.65;
-          const [nx, ny] = norm(player.x - fx.x, player.y - fx.y);
-          player.x += nx * 34;
-          player.y += ny * 34;
         }
       }
     }
@@ -3694,6 +3855,50 @@ const UPGRADE_POOL = [
     apply() { weapons.frost.enabled = true; weapons.frost.lvl = Math.max(1, weapons.frost.lvl); }
   },
 
+  // Aegis (new weapon-like treasure)
+  {
+    id: 'unlock_aegis',
+    title: '解鎖 護盾護符（Aegis）',
+    desc: '初始 3 層護盾，吸收一次傷害會消耗 1 層；未滿層時會自動充能補回。',
+    apply() {
+      const w = weapons.aegis;
+      w.enabled = true;
+      w.lvl = Math.max(1, w.lvl);
+      w.maxCharges = 3;
+      w.charges = 3;
+      w.rechargeSec = 10;
+      w.rechargeT = 0;
+      w.pulseEnabled = false;
+      w.pulseT = 0;
+      w.pulseCd = 5.0;
+      w.pulseRadius = 320;
+    }
+  },
+  {
+    id: 'aegis_recharge_1',
+    title: '護盾護符：充能加快（10s → 8s）',
+    desc: '每補回 1 層護盾所需時間變短。',
+    apply() { weapons.aegis.rechargeSec = 8; weapons.aegis.lvl += 1; }
+  },
+  {
+    id: 'aegis_recharge_2',
+    title: '護盾護符：充能加快（8s → 6.5s）',
+    desc: '護盾回復更快。',
+    apply() { weapons.aegis.rechargeSec = 6.5; weapons.aegis.lvl += 1; }
+  },
+  {
+    id: 'aegis_recharge_3',
+    title: '護盾護符：充能加快（6.5s → 5s）',
+    desc: '護盾回復速度達到最高。',
+    apply() { weapons.aegis.rechargeSec = 5; weapons.aegis.lvl += 1; }
+  },
+  {
+    id: 'aegis_pulse',
+    title: '護盾護符：結界脈衝（每 5 秒）',
+    desc: '每 5 秒釋放一次大範圍 360° 高傷害結界脈衝。',
+    apply() { weapons.aegis.pulseEnabled = true; weapons.aegis.pulseT = 0; weapons.aegis.lvl += 1; }
+  },
+
   // Blades upgrades
   // Removed +1 blades option; blades upgrades should add +2.
   // {
@@ -3992,7 +4197,7 @@ function openReplaceWeaponModal(newWeaponKey) {
   paused = true;
   if (ui.modalTitle) ui.modalTitle.textContent = t('replaceTitle');
 
-  const enabled = enabledWeaponKeys();
+  const enabled = enabledWeaponKeys().filter(k => k !== 'aegis');
   currentChoices = enabled.map(k => ({
     id: `replace_${k}`,
     title: { zh: `替換：${weaponLabel(k)}`, en: `Replace: ${weaponLabel(k)}` },
@@ -4016,8 +4221,8 @@ function openReplaceWeaponModal(newWeaponKey) {
 }
 
 function enabledWeaponKeys() {
-  // weapon slots: Wand/Bow/Holy/Blades only
-  return ['wand', 'bow', 'holy', 'blades'].filter(k => weapons[k].enabled);
+  // weapon slots (includes Aegis as a weapon-like upgrade)
+  return ['wand', 'bow', 'holy', 'blades', 'aegis'].filter(k => weapons[k].enabled);
 }
 
 function enabledMagicKeys() {
@@ -4064,6 +4269,24 @@ function openChoiceModal(mode, title, poolBase) {
     // gate blades upgrades
     if (u.id.startsWith('blades_') && !weapons.blades.enabled) return false;
     if (u.id === 'unlock_blades' && weapons.blades.enabled) return false;
+
+    // gate Aegis upgrades
+    if (u.id.startsWith('aegis_') && !weapons.aegis.enabled) return false;
+    if (u.id === 'unlock_aegis' && weapons.aegis.enabled) return false;
+    if (u.id.startsWith('aegis_')) {
+      const nextA = nextAegisUpgradeId();
+      if (!nextA) return false;
+      if (u.id !== nextA) return false;
+    }
+
+    // gate Aegis upgrades
+    if (u.id.startsWith('aegis_') && !weapons.aegis.enabled) return false;
+    if (u.id === 'unlock_aegis' && weapons.aegis.enabled) return false;
+    if (u.id.startsWith('aegis_')) {
+      const nextA = nextAegisUpgradeId();
+      if (!nextA) return false;
+      if (u.id !== nextA) return false;
+    }
 
     // gate holy water upgrades
     if (u.id.startsWith('holy_') && !weapons.holy.enabled) return false;
@@ -4879,10 +5102,14 @@ function draw() {
       ctx.fillRect(10, view.h - 44, 520, 34);
       ctx.fillStyle = 'rgba(255,255,255,.92)';
       ctx.font = '12px ui-monospace, Menlo, monospace';
+      const aw = weapons.aegis;
+      const aegisTxt = (aw && aw.enabled)
+        ? (' aegis=' + (aw.charges||0) + '/' + (aw.maxCharges||0) + (aw.pulseEnabled ? ' pulse' : '') + ((aw.charges < aw.maxCharges) ? (' +' + (aw.rechargeSec - (aw.rechargeT||0)).toFixed(1) + 's') : ''))
+        : '';
       ctx.fillText(
         'player=(' + player.x.toFixed(1) + ',' + player.y.toFixed(1) + ') ' +
         'screen=(' + psx.toFixed(1) + ',' + psy.toFixed(1) + ') ' +
-        'cam=(' + state.camera.x.toFixed(1) + ',' + state.camera.y.toFixed(1) + ')',
+        'cam=(' + state.camera.x.toFixed(1) + ',' + state.camera.y.toFixed(1) + ')' + aegisTxt,
         16,
         view.h - 22
       );
@@ -4950,8 +5177,17 @@ function updateUI() {
   if (ui.hudWeapons) {
     const ws = enabledWeaponKeys();
     ui.hudWeapons.innerHTML = ws.map(k => {
-      const lvl = weapons[k].lvl || 0;
-      return `<div class="hudItem"><span class="n">${weaponLabel(k)}</span><span class="l">Lv.${lvl}</span></div>`;
+      const w = weapons[k];
+      const lvl = w.lvl || 0;
+      let extra = '';
+      if (k === 'aegis') {
+        const c = (w.charges ?? 0);
+        const m = (w.maxCharges ?? 0);
+        // show charge + recharge progress
+        const need = (c < m) ? ` ${(w.rechargeSec - (w.rechargeT||0)).toFixed(1)}s` : '';
+        extra = ` ${c}/${m}${need}`;
+      }
+      return `<div class="hudItem"><span class="n">${weaponLabel(k)}${extra}</span><span class="l">Lv.${lvl}</span></div>`;
     }).join('') || `<div class="hudLine">(none)</div>`;
   }
 
@@ -5208,6 +5444,18 @@ function resetRun() {
   weapons.frost.maxRadius = 230;
   weapons.frost.speed = 520;
   weapons.frost.cd = 0;
+
+  // Aegis
+  weapons.aegis.enabled = false;
+  weapons.aegis.lvl = 0;
+  weapons.aegis.maxCharges = 3;
+  weapons.aegis.charges = 0;
+  weapons.aegis.rechargeSec = 10;
+  weapons.aegis.rechargeT = 0;
+  weapons.aegis.pulseEnabled = false;
+  weapons.aegis.pulseCd = 5.0;
+  weapons.aegis.pulseT = 0;
+  weapons.aegis.pulseRadius = 320;
 
   enemySpawnAcc = 0;
 }
