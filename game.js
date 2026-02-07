@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v139';
+const BUILD = 'v140';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -70,6 +70,7 @@ const ui = {
   hpFill: document.getElementById('hpFill'),
   sfxBtn: document.getElementById('sfxBtn'),
   langBtn: document.getElementById('langBtn'),
+  hudBtn: document.getElementById('hudBtn'),
   awardLine: document.getElementById('awardLine'),
   subtitle: document.getElementById('subtitle'),
   start: document.getElementById('start'),
@@ -1427,6 +1428,32 @@ ui.pauseBtn?.addEventListener('click', () => {
 
 ui.langBtn?.addEventListener('click', () => {
   setLang(lang === 'zh' ? 'en' : 'zh');
+});
+
+function setHudCollapsed(collapsed) {
+  const uiRoot = document.getElementById('ui');
+  if (!uiRoot) return;
+  uiRoot.classList.toggle('collapsed', !!collapsed);
+  if (ui.hudBtn) ui.hudBtn.textContent = collapsed ? 'HUD ▾' : 'HUD ▴';
+  try { localStorage.setItem('df_hud_collapsed', collapsed ? '1' : '0'); } catch {}
+}
+
+// HUD collapse/expand: mobile default collapsed, desktop default expanded
+try {
+  const saved = localStorage.getItem('df_hud_collapsed');
+  if (saved !== null) {
+    setHudCollapsed(saved === '1');
+  } else {
+    setHudCollapsed(IS_COARSE);
+  }
+} catch {
+  setHudCollapsed(IS_COARSE);
+}
+
+ui.hudBtn?.addEventListener('click', () => {
+  const uiRoot = document.getElementById('ui');
+  const collapsed = uiRoot?.classList.contains('collapsed');
+  setHudCollapsed(!collapsed);
 });
 
 // SFX toggle (default ON)

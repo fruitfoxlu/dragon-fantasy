@@ -200,6 +200,11 @@ body{
 
 /* Inline HUD inside top panel */
 #hudInline{width:100%}
+#ui.collapsed #hudInline{display:none}
+#ui.collapsed .titleRow{margin-bottom:4px}
+#ui.collapsed .row{gap:10px}
+#ui.collapsed{padding:10px 12px}
+
 .hudInlineCol{min-width:160px}
 .hudInlineTitle{font-weight:900; color:rgba(243,241,231,.90); margin-bottom:3px; display:flex; align-items:center; justify-content:space-between; gap:10px}
 .hudMini{font-weight:800; font-size:12px; opacity:0.82}
