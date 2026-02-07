@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v135';
+const BUILD = 'v136';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -499,6 +499,15 @@ function startMusic() {
 function toggleSfx(on) {
   audio.sfxOn = (on !== undefined) ? !!on : !audio.sfxOn;
   setSfxLabel();
+}
+
+function clampMsg(text) {
+  if (!text) return '';
+  const s = String(text);
+  // keep short; subtitle is single-line
+  const max = (lang === 'zh') ? 24 : 52;
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + '…';
 }
 
 function formatTime(s) {
@@ -5028,8 +5037,8 @@ function draw() {
     ctx.fillText('Paused (press P)', 18, 34);
   }
 
-  // toast
-  if (toast.t > 0) {
+  // toast (canvas): keep only in DEBUG so mobile thumbs/joystick won't block it.
+  if (DEBUG && toast.t > 0) {
     ctx.save();
     ctx.globalAlpha = clamp(toast.t / 2, 0, 1);
     ctx.fillStyle = 'rgba(0,0,0,.45)';
@@ -5158,6 +5167,11 @@ function updateUI() {
   ui.xpNeed.textContent = String(player.xpNeed);
   ui.kills.textContent = String(state.kills);
   ui.time.textContent = formatTime(state.elapsed | 0);
+
+  // Subtitle: use toast messages (short, single-line) so it's not blocked by the joystick.
+  if (ui.subtitle) {
+    ui.subtitle.textContent = (toast.t > 0 && toast.text) ? clampMsg(toast.text) : t('subtitle');
+  }
 
   if (ui.awardLine) {
     if (state.currentAwardLevel != null) {
