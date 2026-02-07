@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v136';
+const BUILD = 'v137';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -71,6 +71,7 @@ const ui = {
   sfxBtn: document.getElementById('sfxBtn'),
   langBtn: document.getElementById('langBtn'),
   awardLine: document.getElementById('awardLine'),
+  subtitle: document.getElementById('subtitle'),
   start: document.getElementById('start'),
   startBtn: document.getElementById('startBtn'),
   levelup: document.getElementById('levelup'),
