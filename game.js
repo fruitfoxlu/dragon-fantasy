@@ -49,7 +49,7 @@ resizeCanvas();
 const DEBUG = new URLSearchParams(location.search).has('debug');
 const FAST = new URLSearchParams(location.search).has('fast'); // test helper: faster XP gain
 const TEST = DEBUG || FAST;
-const BUILD = 'v137';
+const BUILD = 'v138';
 
 // Debug log (on-screen)
 const debugLog = [];
@@ -1481,7 +1481,7 @@ const state = {
 const player = {
   x: 0,
   y: 0,
-  passives: { hp: 0, speed: 0, magnet: 0 }, // display-only levels
+  passives: { hp: 0, speed: 0, magnet: 0, regen: 0 }, // display-only levels
 
   r: 14,
   hp: 100,
@@ -2418,6 +2418,15 @@ function updatePlayer(dt) {
   player.invuln = Math.max(0, player.invuln - dt);
 
   updateAegis(dt);
+
+  // Regen passive: heal up to 75% of max HP.
+  const regen = (player.passives.regen || 0);
+  if (regen > 0) {
+    const cap = player.hpMax * 0.75;
+    if (player.hp < cap) {
+      player.hp = Math.min(cap, player.hp + regen * dt);
+    }
+  }
 }
 
 function forwardVec(dir) {
@@ -4039,6 +4048,12 @@ const UPGRADE_POOL = [
     desc: '每升一級，吸經驗球距離加倍。',
     apply() { player.magnet *= 2; player.passives.magnet = (player.passives.magnet || 0) + 1; }
   },
+  {
+    id: 'regen',
+    title: { zh: '再生護符：回血 +1 / 秒', en: 'Regeneration Charm: +1 HP/s' },
+    desc: { zh: '每秒回復 1 點生命（最多回到 75% 血量）。可疊加，最高 Lv5。', en: 'Regenerate 1 HP per second (up to 75% HP). Stacks up to Lv5.' },
+    apply() { player.passives.regen = Math.min(5, (player.passives.regen || 0) + 1); }
+  },
 ];
 
 let currentChoices = [];
@@ -4289,15 +4304,6 @@ function openChoiceModal(mode, title, poolBase) {
       if (u.id !== nextA) return false;
     }
 
-    // gate Aegis upgrades
-    if (u.id.startsWith('aegis_') && !weapons.aegis.enabled) return false;
-    if (u.id === 'unlock_aegis' && weapons.aegis.enabled) return false;
-    if (u.id.startsWith('aegis_')) {
-      const nextA = nextAegisUpgradeId();
-      if (!nextA) return false;
-      if (u.id !== nextA) return false;
-    }
-
     // gate holy water upgrades
     if (u.id.startsWith('holy_') && !weapons.holy.enabled) return false;
     if (u.id === 'unlock_holy' && weapons.holy.enabled) return false;
@@ -4324,6 +4330,9 @@ function openChoiceModal(mode, title, poolBase) {
 
     // Dragon Soul TEMP DISABLED
     if (u.id === 'unlock_dragon' || u.id.startsWith('dragon_')) return false;
+
+    // Regen passive cap
+    if (u.id === 'regen' && (player.passives.regen || 0) >= 5) return false;
 
     return true;
   });
@@ -5220,6 +5229,7 @@ function updateUI() {
     if (p.hp) items.push({ n: (lang === 'zh') ? '體魄' : 'Vitality', l: p.hp });
     if (p.speed) items.push({ n: (lang === 'zh') ? '敏捷' : 'Agility', l: p.speed });
     if (p.magnet) items.push({ n: (lang === 'zh') ? '龍之召喚' : 'Dragon Call', l: p.magnet });
+    if (p.regen) items.push({ n: (lang === 'zh') ? '再生護符' : 'Regen', l: p.regen });
     ui.hudPassives.innerHTML = items.map(it => (
       `<div class="hudItem"><span class="n">${it.n}</span><span class="l">Lv.${it.l}</span></div>`
     )).join('') || `<div class="hudLine">(none)</div>`;
