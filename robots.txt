@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://fruitfoxlu.github.io/dragon-fantasy/sitemap.xml
